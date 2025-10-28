@@ -1,8 +1,9 @@
+// app/rh-dashboard/Sidebar.tsx
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { DecodedToken, useAuth } from '../../lib/useAuth';
+import { DecodedToken } from '../../lib/useAuth';
 import Modal from 'react-modal';
 import { useState } from 'react';
 
@@ -13,16 +14,16 @@ interface SidebarProps {
 
 export default function Sidebar({ logout, user }: SidebarProps) {
   const pathname = usePathname();
-  const { token, loading } = useAuth();
 
+  // ICÔNES EMOJI COMME DEMANDÉ
   const links = [
-    { href: '/dashboard', label: 'Dashboard', icon: '🏠' },
-    { href: '/dashboard/conges', label: 'Congés / Permissions', icon: '📅' },
-    { href: '/dashboard/presences', label: 'Présences / Absences', icon: '📊' },
-    { href: '/dashboard/salaires', label: 'Paie / Salaires', icon: '💰' },
-    { href: '/dashboard/notifications', label: 'Notifications', icon: '🔔' },
-    { href: '/dashboard/parametres', label: 'Paramètres', icon: '⚙️' },
-    { href: '/dashboard/profil', label: 'Profil', icon: '👤' },
+    { href: '/rh-dashboard', label: 'Tableau de bord RH', icon: '🏠' },
+    { href: '/rh-dashboard/employes', label: 'Gestion des employés', icon: '👥' },
+    { href: '/rh-dashboard/conges', label: 'Gestion des congés', icon: '📅' },
+    { href: '/rh-dashboard/presences', label: 'Gestion des présences', icon: '📊' },
+    { href: '/rh-dashboard/salaires', label: 'Gestion des salaires', icon: '💰' },
+    { href: '/rh-dashboard/notifications', label: 'Notifications RH', icon: '🔔' },
+    { href: '/rh-dashboard/parametres', label: 'Paramètres RH', icon: '⚙️' },
   ];
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,6 +60,7 @@ export default function Sidebar({ logout, user }: SidebarProps) {
           ))}
         </nav>
       </div>
+
       <div className="border-t border-blue-700 pt-4">
         <p className="text-sm mb-4">Connecté comme: {user?.prenom || user?.email || 'Inconnu'}</p>
         <button
@@ -70,9 +72,11 @@ export default function Sidebar({ logout, user }: SidebarProps) {
         </button>
       </div>
 
+      {/* MODAL DE DÉCONNEXION */}
       <Modal
         isOpen={isModalOpen}
         onRequestClose={cancelLogout}
+        shouldCloseOnOverlayClick={true}
         style={{
           content: {
             top: '50%',
@@ -81,29 +85,35 @@ export default function Sidebar({ logout, user }: SidebarProps) {
             bottom: 'auto',
             marginRight: '-50%',
             transform: 'translate(-50%, -50%)',
-            padding: '20px',
-            borderRadius: '8px',
+            padding: '24px',
+            borderRadius: '12px',
             backgroundColor: '#fff',
             color: '#000',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
           },
           overlay: {
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 1000,
           },
         }}
         contentLabel="Confirmation de déconnexion"
       >
-        <h2 className="text-xl font-bold mb-4">Confirmer la déconnexion</h2>
-        <p className="mb-4">Êtes-vous sûr de vouloir vous déconnecter ?</p>
-        <div className="flex justify-end space-x-4">
+        <h2 className="text-2xl font-bold mb-4 text-center">Confirmer la déconnexion</h2>
+        <p className="mb-6 text-center text-gray-700">
+          Êtes-vous sûr de vouloir vous déconnecter ?
+        </p>
+        <div className="flex justify-center gap-4">
           <button
             onClick={cancelLogout}
-            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+            className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition font-medium"
           >
             Annuler
           </button>
           <button
             onClick={confirmLogout}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
           >
             Déconnexion
           </button>

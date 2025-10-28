@@ -1,5 +1,7 @@
+// app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
+import ModalAppElement from './ModalAppElement';
 
 export const metadata: Metadata = {
   title: "Promotic_RH",
@@ -12,9 +14,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <body className="antialiased">
-        {children}
+        <div id="__next">
+          <ModalAppElement /> {/* AJOUTÉ ICI */}
+          {children}
+        </div>
       </body>
     </html>
   );

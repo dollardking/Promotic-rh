@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { useRouter } from 'next/navigation';
 
-interface DecodedToken {
+export interface DecodedToken {
   id: number;
   email: string;
   role: string;
@@ -16,7 +16,6 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Déclaration de logout avec useCallback pour stabiliser la référence
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     setToken(null);
@@ -26,13 +25,16 @@ export const useAuth = () => {
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
+    console.log('Stored token:', storedToken);
     if (storedToken) {
       try {
         const decoded = jwtDecode(storedToken) as DecodedToken;
+        console.log('Decoded token:', decoded);
         if (decoded.exp * 1000 > Date.now()) {
           setToken(storedToken);
           setUser(decoded);
         } else {
+          console.warn('Token expiré, déconnexion');
           logout();
         }
       } catch (error) {
@@ -41,7 +43,7 @@ export const useAuth = () => {
       }
     }
     setLoading(false);
-  }, [logout]); // logout est maintenant stable grâce à useCallback
+  }, [logout]);
 
   const login = (newToken: string) => {
     if (!newToken) {
@@ -51,6 +53,7 @@ export const useAuth = () => {
     try {
       localStorage.setItem('token', newToken);
       const decoded = jwtDecode(newToken) as DecodedToken;
+      console.log('Login decoded token:', decoded);
       if (decoded.exp * 1000 <= Date.now()) {
         console.error('Token expiré');
         logout();
@@ -58,12 +61,33 @@ export const useAuth = () => {
       }
       setToken(newToken);
       setUser(decoded);
-      router.push(decoded.role === 'employe' ? '/dashboard' : '/admin-dashboard');
+      const role = decoded.role.toLowerCase();
+      if (role === 'employe') {
+        router.push('/dashboard');
+      } else if (role === 'rh') {
+        router.push('/rh-dashboard');
+      } else if (role === 'admin') {
+        router.push('/admin-dashboard');
+      }
     } catch (error) {
       console.error('Erreur lors du décodage du token:', error);
       logout();
     }
   };
+
+  useEffect(() => {
+    const checkTokenExpiration = () => {
+      if (token) {
+        const decoded = jwtDecode(token) as DecodedToken;
+        if (decoded.exp * 1000 <= Date.now()) {
+          console.warn('Token expiré lors de la vérification périodique');
+          logout();
+        }
+      }
+    };
+    const interval = setInterval(checkTokenExpiration, 60000);
+    return () => clearInterval(interval);
+  }, [token, logout]);
 
   return { token, user, loading, login, logout };
 };

@@ -1,25 +1,24 @@
-// app/dashboard/layout.tsx
+// app/rh-dashboard/layout.tsx
 'use client';
 
 import { ReactNode, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { useAuth } from '../../lib/useAuth';
 import { redirect } from 'next/navigation';
+
 // SUPPRIME CETTE LIGNE : import Modal from 'react-modal';
 
-// SUPPRIME CETTE LIGNE : Modal.setAppElement('#__next');
-
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+export default function RhDashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== 'employe')) {
+    if (!loading && (!user || user.role !== 'rh')) {
       redirect('/login');
     }
   }, [user, loading]);
 
   if (loading) return <p className="text-center mt-10">Chargement...</p>;
-  if (!user || user.role !== 'employe') {
+  if (!user || user.role !== 'rh') {
     return null;
   }
 

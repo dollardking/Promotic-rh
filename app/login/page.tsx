@@ -38,7 +38,7 @@ export default function LoginPage() {
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Erreur lors de la connexion.');
-        setTimeout(() => login(data.token), 1000);
+        login(data.token); // Suppression du setTimeout
       } catch (error) {
         setErrors({ submit: (error as Error).message });
       } finally {

@@ -14,16 +14,19 @@ generator client {
 }
 
 model Utilisateur {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  motDePasse String
-  role      String   @default("Employe") // Admin, RH, Employe
-  resetToken     String?  @map("reset_token") // Champ nullable pour le token de réinitialisation
+  id              Int       @id @default(autoincrement())
+  email           String    @unique
+  motDePasse      String
+  role            String    @default("Employe") // Admin, RH, Employe
+  resetToken      String?   @map("reset_token") // Champ nullable pour le token de réinitialisation
   resetTokenExpiry DateTime? @map("reset_token_expiry") // Date d'expiration nullable
-  dateCreation DateTime @default(now())
-  actif     Boolean  @default(true)
-  employe   Employe? @relation("UtilisateurEmploye")
-  employeId Int?     @unique
+  dateCreation    DateTime  @default(now())
+  actif           Boolean   @default(true)
+  employe         Employe?  @relation("UtilisateurEmploye")
+  employeId       Int?      @unique
+  conges          Conge[]   // Relation opposée pour les congés
+  notifications   Notification[] // Relation opposée pour les notifications
+  prefs           Json?     // Ajout pour stocker les préférences (langue, notificationsActives, etc.)
 }
 
 model Employe {
@@ -41,7 +44,7 @@ model Employe {
   utilisateurId Int?        @unique
   departement  Departement? @relation(fields: [departementId], references: [id])
   departementId Int?
-  conges       Conge[]
+  conges       Conge[]      // Relation pour les congés de cet employé
   permissions  Permission[]
   presences    Presence[]
   salaires     Salaire[]
@@ -56,13 +59,16 @@ model Departement {
 
 model Conge {
   id          Int      @id @default(autoincrement())
-  employeId   Int
-  employe     Employe  @relation(fields: [employeId], references: [id])
-  dateDebut   DateTime
-  dateFin     DateTime
-  motif       String?
-  statut      String   @default("Pending") // Pending, Approved, Rejected
-  dateCreation DateTime @default(now())
+  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id])
+  utilisateurId Int
+  employe     Employe? @relation(fields: [employeId], references: [id]) // Relation facultative avec Employe
+  employeId   Int?     // Champ nullable pour lier à Employe si nécessaire
+  startDate   DateTime
+  endDate     DateTime
+  type        String   // "conge" ou "permission"
+  status      String   @default("En attente") // "En attente", "Approuvé", "Rejeté"
+  reason      String
+  createdAt   DateTime @default(now())
 }
 
 model Permission {
@@ -107,4 +113,13 @@ model Rapport {
   contenu      String?
   dateGeneration DateTime @default(now())
   dateCreation DateTime @default(now())
+}
+model Notification {
+  id           Int      @id @default(autoincrement())
+  utilisateurId Int
+  utilisateur  Utilisateur @relation(fields: [utilisateurId], references: [id])
+  message      String
+  lu           Boolean  @default(false)
+  dateCreation DateTime @default(now())
+  lien         String?  // Optionnel : lien vers une page spécifique (ex. : détails d'un congé)
 }
