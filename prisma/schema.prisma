@@ -18,15 +18,15 @@ model Utilisateur {
   email           String    @unique
   motDePasse      String
   role            String    @default("Employe") // Admin, RH, Employe
-  resetToken      String?   @map("reset_token") // Champ nullable pour le token de réinitialisation
-  resetTokenExpiry DateTime? @map("reset_token_expiry") // Date d'expiration nullable
+  resetToken      String?   @map("reset_token")
+  resetTokenExpiry DateTime? @map("reset_token_expiry")
   dateCreation    DateTime  @default(now())
   actif           Boolean   @default(true)
   employe         Employe?  @relation("UtilisateurEmploye")
-  employeId       Int?      @unique
-  conges          Conge[]   // Relation opposée pour les congés
-  notifications   Notification[] // Relation opposée pour les notifications
-  prefs           Json?     // Ajout pour stocker les préférences (langue, notificationsActives, etc.)
+  conges          Conge[]
+  notifications   Notification[]
+  rapports        Rapport[]  // ← AJOUTÉ : Relation inverse pour les rapports générés par le RH
+  prefs           Json?
 }
 
 model Employe {
@@ -44,42 +44,43 @@ model Employe {
   utilisateurId Int?        @unique
   departement  Departement? @relation(fields: [departementId], references: [id])
   departementId Int?
-  conges       Conge[]      // Relation pour les congés de cet employé
+  conges       Conge[]
   permissions  Permission[]
   presences    Presence[]
   salaires     Salaire[]
 }
 
 model Departement {
-  id          Int      @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   nomDepartement String @unique
-  description String?
-  employes    Employe[]
+  description  String?
+  employes     Employe[]
+  createdAt    DateTime @default(now())
 }
 
 model Conge {
-  id          Int      @id @default(autoincrement())
-  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id])
+  id            Int      @id @default(autoincrement())
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
   utilisateurId Int
-  employe     Employe? @relation(fields: [employeId], references: [id]) // Relation facultative avec Employe
-  employeId   Int?     // Champ nullable pour lier à Employe si nécessaire
-  startDate   DateTime
-  endDate     DateTime
-  type        String   // "conge" ou "permission"
-  status      String   @default("En attente") // "En attente", "Approuvé", "Rejeté"
-  reason      String
-  createdAt   DateTime @default(now())
+  employe       Employe? @relation(fields: [employeId], references: [id])
+  employeId     Int?
+  startDate     DateTime
+  endDate       DateTime
+  type          String
+  status        String   @default("En attente")
+  reason        String
+  createdAt     DateTime @default(now())
 }
 
 model Permission {
-  id          Int      @id @default(autoincrement())
-  employeId   Int
-  employe     Employe  @relation(fields: [employeId], references: [id])
-  date        DateTime
-  heureDebut  DateTime
-  heureFin    DateTime?
-  motif       String?
-  statut      String   @default("Pending") // Pending, Approved, Rejected
+  id           Int      @id @default(autoincrement())
+  employeId    Int
+  employe      Employe  @relation(fields: [employeId], references: [id])
+  date         DateTime
+  heureDebut   DateTime
+  heureFin     DateTime?
+  motif        String?
+  statut       String   @default("Pending")
   dateCreation DateTime @default(now())
 }
 
@@ -89,8 +90,7 @@ model Presence {
   employe      Employe  @relation(fields: [employeId], references: [id])
   heureArrivee DateTime
   heureDepart  DateTime?
-  trajet       DateTime?
-  statut       String   @default("Present") // Present, Absent, Conge, Maladie, Retard, AbsentSansJustification
+  statut       String   @default("Present")
   dateCreation DateTime @default(now())
 }
 
@@ -103,23 +103,28 @@ model Salaire {
   deductions   Float    @default(0)
   mois         DateTime
   datePaiement DateTime?
-  statut       String   @default("En attente") // En attente, Paye, Salaire non regu
+  statut       String   @default("En attente")
   dateCreation DateTime @default(now())
 }
 
 model Rapport {
-  id           Int      @id @default(autoincrement())
-  type         String   @default("PDF") // PDF, Excel
-  contenu      String?
+  id             Int      @id @default(autoincrement())
+  type           String
+  contenu        Bytes?
+  nomFichier     String?   // ← ? (optionnel)
+  taille         Int?      // ← ? (optionnel)
+  envoyeAAdmin   Boolean  @default(false)
   dateGeneration DateTime @default(now())
-  dateCreation DateTime @default(now())
+  rhId           Int?      // ← ? (optionnel)
+  rh             Utilisateur? @relation(fields: [rhId], references: [id]) // ← ? aussi
 }
+
 model Notification {
-  id           Int      @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   utilisateurId Int
-  utilisateur  Utilisateur @relation(fields: [utilisateurId], references: [id])
-  message      String
-  lu           Boolean  @default(false)
-  dateCreation DateTime @default(now())
-  lien         String?  // Optionnel : lien vers une page spécifique (ex. : détails d'un congé)
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  message       String
+  lu            Boolean  @default(false)
+  dateCreation  DateTime @default(now())
+  lien          String?
 }

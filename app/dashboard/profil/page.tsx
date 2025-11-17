@@ -1,102 +1,274 @@
+// app/dashboard/profil/page.tsx
 'use client';
 
 import { useAuth } from '../../../lib/useAuth';
 import { useState, useEffect } from 'react';
 
+interface EmployeData {
+  id: number;
+  matricule: string;
+  nom: string;
+  prenom: string;
+  email: string;
+  telephone: string | null;
+  dateEmbauche: string | null;
+  dateDepart: string | null;
+  competences: string | null;
+  actif: boolean;
+  departement: { nomDepartement: string } | null;
+  utilisateurId: number;
+}
+
+interface Summary {
+  presencesCount: number;
+  salairesCount: number;
+  congesCount: number;
+  permissionsCount: number;
+}
+
 export default function ProfilPage() {
-  const { user, token, loading } = useAuth();
-  const [profileData, setProfileData] = useState({ prenom: '', nom: '', email: '', role: '' });
-  const [summary, setSummary] = useState({ presencesCount: 0, salairesCount: 0 });
+  const { user, token, loading: authLoading } = useAuth();
+  const [employe, setEmploye] = useState<EmployeData | null>(null);
+  const [summary, setSummary] = useState<Summary>({
+    presencesCount: 0,
+    salairesCount: 0,
+    congesCount: 0,
+    permissionsCount: 0,
+  });
+  const [form, setForm] = useState({
+    telephone: '',
+    dateEmbauche: '',
+    dateDepart: '',
+    competences: '',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const fetchProfileData = async () => {
-      if (loading || !token) {
-        console.log('Chargement en cours ou token absent, attente...', { loading, token });
-        return;
-      }
+    if (authLoading || !token || !user) return;
+
+    const fetchProfil = async () => {
+      setLoading(true);
       try {
-        // Récupérer les informations de l'utilisateur
-        const userResponse = await fetch(`/api/users/${user?.id}`, {
-          headers: {
-            'authorization': `Bearer ${token}`,
-          },
+        // 1. Profil employé
+        const empRes = await fetch('/api/employes/profil', {
+          headers: { authorization: `Bearer ${token}` },
         });
-        const userData = await userResponse.json();
-        if (userResponse.ok) {
-          setProfileData({
-            prenom: userData.user.prenom || '',
-            nom: userData.user.nom || '',
-            email: userData.user.email || '',
-            role: userData.user.role || '',
+        const empData = await empRes.json();
+
+        if (empRes.ok && empData.employe) {
+          setEmploye(empData.employe);
+          setForm({
+            telephone: empData.employe.telephone || '',
+            dateEmbauche: empData.employe.dateEmbauche?.split('T')[0] || '',
+            dateDepart: empData.employe.dateDepart?.split('T')[0] || '',
+            competences: empData.employe.competences || '',
           });
         } else {
-          console.error('Erreur API utilisateur:', userData.error);
+          setMessage('Profil non trouvé.');
+          setLoading(false);
+          return;
         }
 
-        // Récupérer le nombre de présences
-        const presencesResponse = await fetch('/api/presences', {
-          headers: {
-            'authorization': `Bearer ${token}`,
-          },
-        });
-        const presencesData = await presencesResponse.json();
-        if (presencesResponse.ok) {
-          setSummary((prev) => ({ ...prev, presencesCount: presencesData.presences.length }));
-        } else {
-          console.error('Erreur API présences:', presencesData.error);
-        }
+        // 2. Résumé : CORRIGÉ
+        const [presRes, salRes, congeRes, permRes] = await Promise.all([
+          fetch('/api/presences', { headers: { authorization: `Bearer ${token}` } }),
+          fetch('/api/salaires', { headers: { authorization: `Bearer ${token}` } }),
+          fetch('/api/conges', { headers: { authorization: `Bearer ${token}` } }),
+          fetch('/api/permissions', { headers: { authorization: `Bearer ${token}` } }),
+        ]);
 
-        // Récupérer le nombre de salaires
-        const salairesResponse = await fetch('/api/salaires', {
-          headers: {
-            'authorization': `Bearer ${token}`,
-          },
+        const presData = await presRes.json();
+        const salData = await salRes.json();
+        const congeData = await congeRes.json();
+        const permData = await permRes.json();
+
+        setSummary({
+          presencesCount: Array.isArray(presData.presences) ? presData.presences.length : 0,
+          salairesCount: Array.isArray(salData.salaires) ? salData.salaires.length : 0,
+          congesCount: Array.isArray(congeData.conges) ? congeData.conges.length : 0,
+          permissionsCount: Array.isArray(permData.permissions) ? permData.permissions.length : 0,
         });
-        const salairesData = await salairesResponse.json();
-        if (salairesResponse.ok) {
-          setSummary((prev) => ({ ...prev, salairesCount: salairesData.salaires.length }));
-        } else {
-          console.error('Erreur API salaires:', salairesData.error);
-        }
       } catch (error) {
-        console.error('Erreur lors du chargement du profil:', error);
+        console.error('Erreur fetch:', error);
+        setMessage('Erreur de chargement du profil.');
+      } finally {
+        setLoading(false);
       }
     };
-    fetchProfileData();
-  }, [token, loading, user?.id]);
 
-  useEffect(() => {
-    document.querySelector('.profil-message')?.classList.add('animate-fadeIn');
-  }, [message]);
+    fetchProfil();
+  }, [token, authLoading, user]);
 
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employe) return;
+
+    setSaving(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/employes/profil', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          telephone: form.telephone,
+          dateEmbauche: form.dateEmbauche || null,
+          dateDepart: form.dateDepart || null,
+          competences: form.competences,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur mise à jour');
+
+      setMessage('Profil mis à jour avec succès !');
+      setTimeout(() => setMessage(''), 4000);
+    } catch {
+      setMessage('Échec de la mise à jour.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <svg className="animate-spin h-10 w-10 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="text-black mt-4">Chargement du profil...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!employe) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+        <p className="text-red-600">Aucun profil employé trouvé.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="w-full max-w-2xl space-y-8">
-        <h1 className="text-3xl font-bold text-center text-blue-600 mb-6">Profil</h1>
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-4xl mx-auto space-y-8">
+
+        <h1 className="text-4xl font-bold text-center text-blue-800">Mon Profil</h1>
+
         {message && (
-          <div className="profil-message text-green-600 text-center p-2 bg-green-100 rounded-lg">
+          <div
+            className={`p-4 rounded-lg text-center font-medium border transition-all ${
+              message.includes('succès') ? 'text-green-700 bg-green-100 border-green-300' : 'text-red-700 bg-red-100 border-red-300'
+            }`}
+          >
             {message}
           </div>
         )}
-        <section className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-black">Informations Personnelles</h2>
-          <div className="space-y-2">
-            <p><strong>Prénom :</strong> {profileData.prenom}</p>
-            <p><strong>Nom :</strong> {profileData.nom}</p>
-            <p><strong>Email :</strong> {profileData.email}</p>
-            <p><strong>Rôle :</strong> {profileData.role}</p>
+
+        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-2xl font-semibold text-black mb-4">Informations Personnelles</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-black">
+            <p><strong>Matricule :</strong> {employe.matricule}</p>
+            <p><strong>Prénom :</strong> {employe.prenom}</p>
+            <p><strong>Nom :</strong> {employe.nom}</p>
+            <p><strong>Email :</strong> {employe.email}</p>
+            <p><strong>Département :</strong> {employe.departement?.nomDepartement || 'Aucun'}</p>
+            <p><strong>Statut :</strong> <span className={employe.actif ? 'text-green-600' : 'text-red-600'}>{employe.actif ? 'Actif' : 'Inactif'}</span></p>
           </div>
         </section>
-        <section className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-black">Résumé des Activités</h2>
-          <div className="space-y-2">
-            <p><strong>Nombre de présences enregistrées :</strong> {summary.presencesCount}</p>
-            <p><strong>Nombre de salaires enregistrés :</strong> {summary.salairesCount}</p>
-            {/* Ajouter nombre de congés si API disponible */}
-            {/* <p><strong>Nombre de congés pris :</strong> {summary.congesCount}</p> */}
+
+        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-2xl font-semibold text-black mb-4">Compléter mon profil</h2>
+          <form onSubmit={handleSave} className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-black mb-1">Téléphone</label>
+              <input
+                type="tel"
+                value={form.telephone}
+                onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
+                placeholder="ex: +225 01 02 03 04"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-black mb-1">Date d&apos;embauche</label>
+                <input
+                  type="date"
+                  value={form.dateEmbauche}
+                  onChange={(e) => setForm({ ...form, dateEmbauche: e.target.value })}
+                  className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-black mb-1">Date de départ (facultatif)</label>
+                <input
+                  type="date"
+                  value={form.dateDepart}
+                  onChange={(e) => setForm({ ...form, dateDepart: e.target.value })}
+                  className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-black mb-1">Compétences</label>
+              <textarea
+                value={form.competences}
+                onChange={(e) => setForm({ ...form, competences: e.target.value })}
+                className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
+                rows={3}
+                placeholder="ex: JavaScript, React, Gestion de projet..."
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2 transition"
+            >
+              {saving ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Enregistrement...
+                </>
+              ) : (
+                'Mettre à jour le profil'
+              )}
+            </button>
+          </form>
+        </section>
+
+        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-2xl font-semibold text-black mb-4">Résumé de mes activités</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-black">
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <p className="text-3xl font-bold text-blue-700">{summary.presencesCount}</p>
+              <p className="text-sm text-gray-600">Présences enregistrées</p>
+            </div>
+            <div className="p-4 bg-green-50 rounded-lg">
+              <p className="text-3xl font-bold text-green-700">{summary.salairesCount}</p>
+              <p className="text-sm text-gray-600">Salaires versés</p>
+            </div>
+            <div className="p-4 bg-purple-50 rounded-lg">
+              <p className="text-3xl font-bold text-purple-700">{summary.congesCount}</p>
+              <p className="text-sm text-gray-600">Congés pris</p>
+            </div>
+            <div className="p-4 bg-orange-50 rounded-lg">
+              <p className="text-3xl font-bold text-orange-700">{summary.permissionsCount}</p>
+              <p className="text-sm text-gray-600">Permissions demandées</p>
+            </div>
           </div>
         </section>
       </div>

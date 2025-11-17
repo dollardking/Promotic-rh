@@ -1,94 +1,84 @@
+// app/rh-dashboard/notifications/page.tsx
 'use client';
 
 import { useAuth } from '../../../lib/useAuth';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Définition des interfaces
 interface Notification {
   id: number;
-  utilisateurId: number;
   message: string;
+  dateCreation: string;
   lu: boolean;
-  dateCreation: Date;
-  lien: string | null;
+  lien?: string | null;
 }
 
 export default function NotificationsPage() {
   const { token, loading } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [message, setMessage] = useState('');
   const router = useRouter();
 
-  const handleNotificationClick = (notification: Notification) => {
-    // Extraire l'ID de la demande à partir du message (exemple : parsing simple)
-    const match = notification.message.match(/de (\d+)/);
-    const congeId = match ? parseInt(match[1]) : null;
-    if (congeId) {
-      router.push(`/rh-dashboard/conges?id=${congeId}`);
-    } else {
-      router.push('/rh-dashboard/conges'); // Redirection par défaut si ID non trouvé
+  useEffect(() => {
+    if (loading || !token) return;
+
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch('/api/notifications', {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setNotifications(data.notifications || []);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchNotifications();
+  }, [token, loading]);
+
+  const handleClick = (lien: string | null) => {
+    if (lien) {
+      router.push(lien);
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (loading || !token) {
-        console.log('Chargement en cours ou token absent, attente...', { loading, token });
-        return;
-      }
-      try {
-        const notificationsResponse = await fetch('/api/notifications', {
-          headers: { 'authorization': `Bearer ${token}` },
-        });
-        const notificationsData = await notificationsResponse.json();
-        if (notificationsResponse.ok) {
-          setNotifications(notificationsData.notifications as Notification[]);
-        } else {
-          throw new Error('Échec de la récupération des notifications');
-        }
-      } catch (error) {
-        setMessage(`Erreur : ${(error as Error).message}`);
-      }
-    };
-    fetchData();
-  }, [token, loading]);
-
-  useEffect(() => {
-    document.querySelector('.notification-message')?.classList.add('animate-fadeIn');
-  }, [message]);
-
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
+  if (loading) return <p className="text-center mt-10 text-black">Chargement...</p>;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="w-full max-w-2xl space-y-8">
-        <h1 className="text-3xl font-bold text-center text-blue-600 mb-6">Gestion des notifications</h1>
-        {message && (
-          <div className="notification-message text-green-600 text-center p-2 bg-green-100 rounded-lg">
-            {message}
-          </div>
-        )}
-        <section className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-black">Liste des notifications</h2>
-          <ul className="space-y-2">
-            {notifications.map((notification) => (
-              <li key={notification.id} className="p-2 bg-gray-100 rounded text-black">
-                <span
-                  onClick={() => handleNotificationClick(notification)}
-                  style={{ cursor: 'pointer', color: 'blue' }}
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <h1 className="text-4xl font-bold text-center text-blue-800">Notifications RH</h1>
+
+        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <ul className="space-y-3">
+            {notifications.length === 0 ? (
+              <li className="text-center text-gray-500 py-8">Aucune notification.</li>
+            ) : (
+              notifications.map(notif => (
+                <li
+                  key={notif.id}
+                  className={`p-4 rounded-lg border ${
+                    notif.lu ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-300'
+                  }`}
                 >
-                  {notification.message} - Créée le: {notification.dateCreation.toLocaleString('fr-FR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'GMT',
-                  })}
-                </span>
-              </li>
-            ))}
+                  <p className="text-black font-medium">{notif.message}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(notif.dateCreation).toLocaleString('fr-FR')}
+                  </p>
+
+                  {notif.lien && (
+                    <button
+                      onClick={() => handleClick(notif.lien!)}
+                      className="mt-2 text-blue-600 font-medium hover:underline text-sm"
+                    >
+                      Voir détail →
+                    </button>
+                  )}
+                </li>
+              ))
+            )}
           </ul>
         </section>
       </div>

@@ -18,7 +18,7 @@ export default function Sidebar({ logout, user }: SidebarProps) {
   // ICÔNES EMOJI COMME DEMANDÉ
   const links = [
     { href: '/rh-dashboard', label: 'Tableau de bord RH', icon: '🏠' },
-    { href: '/rh-dashboard/employes', label: 'Gestion des employés', icon: '👥' },
+    { href: '/rh-dashboard/departements', label: 'Départements et Rapports', icon: '🏢' },
     { href: '/rh-dashboard/conges', label: 'Gestion des congés', icon: '📅' },
     { href: '/rh-dashboard/presences', label: 'Gestion des présences', icon: '📊' },
     { href: '/rh-dashboard/salaires', label: 'Gestion des salaires', icon: '💰' },
@@ -44,7 +44,7 @@ export default function Sidebar({ logout, user }: SidebarProps) {
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-blue-600 to-indigo-800 text-white p-6 flex flex-col justify-between shadow-xl transition-all duration-300">
       <div>
-        <h2 className="text-2xl font-bold mb-8 text-center animate-pulse">Promotic RH</h2>
+        <h2 className="text-2xl font-bold mb-8 text-center animate-pulse">Promotic_RH</h2>
         <nav className="space-y-4">
           {links.map((link) => (
             <Link

@@ -3,17 +3,17 @@
 import { useAuth } from '../../../lib/useAuth';
 import { useState, useEffect } from 'react';
 
-// Définition des interfaces
 interface Salaire {
   id: number;
   employeId: number;
   salaireBase: number;
   primes: number;
   deductions: number;
-  mois: Date;
-  datePaiement: Date | null;
+  mois: string;
+  datePaiement: string | null;
   statut: string;
-  dateCreation: Date;
+  dateCreation: string;
+  motifRejet?: string | null;
 }
 
 interface Employe {
@@ -30,16 +30,18 @@ export default function SalairesPage() {
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedSalaire, setSelectedSalaire] = useState<Salaire | null>(null);
   const [formData, setFormData] = useState({
     employeId: 0,
     salaireBase: 0,
     primes: 0,
     deductions: 0,
-    mois: '',
+    mois: new Date().toISOString().slice(0, 7),
     datePaiement: '',
-    statut: 'En attente',
+    statut: 'En attente de validation',
   });
   const [filters, setFilters] = useState({ mois: '', statut: '' });
+  const [moisCourant, setMoisCourant] = useState(new Date().toISOString().slice(0, 7));
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -55,39 +57,153 @@ export default function SalairesPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.employeId || !formData.salaireBase || !formData.mois) {
-      setMessage('Les champs requis (employé, salaire de base, mois) doivent être remplis.');
-      return;
+  e.preventDefault();
+  setIsSubmitting(true);
+  try {
+    const endpoint = selectedSalaire ? `/api/salaire/${selectedSalaire.id}` : '/api/salaire';
+    const method = selectedSalaire ? 'PUT' : 'POST';
+
+    const response = await fetch(endpoint, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        employeId: Number(formData.employeId),
+        salaireBase: Number(formData.salaireBase),
+        primes: Number(formData.primes),
+        deductions: Number(formData.deductions),
+        mois: formData.mois,
+        datePaiement: formData.datePaiement || null,
+        statut: formData.statut,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.error || 'Erreur');
+
+    if (selectedSalaire) {
+      setSalaires((prev) => prev.map((s) => (s.id === selectedSalaire.id ? data.salaire : s)));
+      setFilteredSalaires((prev) => prev.map((s) => (s.id === selectedSalaire.id ? data.salaire : s)));
+    } else {
+      setSalaires((prev) => [data.salaire, ...prev]);
+      setFilteredSalaires((prev) => [data.salaire, ...prev]);
     }
+
+    setMessage(data.message || 'Opération réussie !');
+    resetForm();
+    setTimeout(() => setMessage(''), 3000);
+  } catch (error: any) {
+    setMessage(error.message || 'Erreur');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+  const resetForm = () => {
+    setFormData({
+      employeId: 0,
+      salaireBase: 0,
+      primes: 0,
+      deductions: 0,
+      mois: new Date().toISOString().slice(0, 7),
+      datePaiement: '',
+      statut: 'En attente de validation',
+    });
+    setSelectedSalaire(null);
+  };
+
+  const handleEdit = (salaire: Salaire) => {
+    setFormData({
+      employeId: salaire.employeId,
+      salaireBase: salaire.salaireBase,
+      primes: salaire.primes,
+      deductions: salaire.deductions,
+      mois: new Date(salaire.mois).toISOString().slice(0, 7),
+      datePaiement: salaire.datePaiement ? new Date(salaire.datePaiement).toISOString().slice(0, 10) : '',
+      statut: salaire.statut,
+    });
+    setSelectedSalaire(salaire);
+  };
+
+  const handleValidatePayment = async (id: number) => {
+  setIsSubmitting(true);
+  try {
+    const res = await fetch(`/api/salaire/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ statut: 'Payé' }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erreur');
+
+    setSalaires(prev => prev.map(s => s.id === id ? data.salaire : s));
+    setFilteredSalaires(prev => prev.map(s => s.id === id ? data.salaire : s));
+    setMessage(data.message);
+    setTimeout(() => setMessage(''), 4000);
+  } catch (error: any) {
+    setMessage(error.message);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+  const handleGenerateMonthly = async () => {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/salaires', {
+      const res = await fetch('/api/salaire/monthly', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ...formData,
-          mois: new Date(formData.mois).toISOString(),
-          datePaiement: formData.datePaiement ? new Date(formData.datePaiement).toISOString() : null,
-        }),
+        body: JSON.stringify({ mois: moisCourant }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Erreur lors de l\'ajout');
-      setSalaires((prev) => [data.salaire as Salaire, ...prev]);
-      setFilteredSalaires((prev) => [data.salaire as Salaire, ...prev]);
-      setFormData({
-        employeId: 0,
-        salaireBase: 0,
-        primes: 0,
-        deductions: 0,
-        mois: '',
-        datePaiement: '',
-        statut: 'En attente',
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur génération');
+
+      setMessage('Salaires du mois calculés avec succès !');
+      setTimeout(() => setMessage(''), 3000);
+      fetchSalaires();
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGenerateForEmploye = async () => {
+    if (!formData.employeId || !formData.mois) {
+      setMessage('Employé et mois requis.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/salaire/calculate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ employeId: formData.employeId, mois: formData.mois }),
       });
-      setMessage('Salaire enregistré avec succès !');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur calcul');
+
+      setFormData((prev) => ({
+        ...prev,
+        salaireBase: data.salaireBase,
+        primes: data.primes,
+        deductions: data.deductions,
+      }));
+
+      setMessage('Salaire calculé pour l\'employé !');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage((error as Error).message);
@@ -96,54 +212,68 @@ export default function SalairesPage() {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (loading || !token) {
-        console.log('Chargement en cours ou token absent, attente...', { loading, token });
-        return;
-      }
-      try {
-        // Récupérer les salaires
-        const salairesResponse = await fetch('/api/salaires', {
-          headers: { 'authorization': `Bearer ${token}` },
-        });
-        const salairesData = await salairesResponse.json();
-        if (salairesResponse.ok) {
-          setSalaires(salairesData.salaires as Salaire[]);
-          setFilteredSalaires(salairesData.salaires as Salaire[]);
-        }
+  // Dans useEffect
+const fetchSalaires = async () => {
+  try {
+    const response = await fetch('/api/salaire', {
+      method: 'GET',
+      headers: {
+        'authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-        // Récupérer les employés pour le sélecteur
-        const employesResponse = await fetch('/api/employes', {
-          headers: { 'authorization': `Bearer ${token}` },
-        });
-        const employesData = await employesResponse.json();
-        if (employesResponse.ok) {
-          setEmployes(employesData.employes as Employe[]);
-        }
-      } catch (error) {
-        console.error('Erreur lors du chargement des données:', error);
+    let errorMessage = 'Erreur inconnue';
+
+    if (!response.ok) {
+      try {
+        const err = await response.json();
+        errorMessage = err.error || `Erreur HTTP ${response.status}`;
+      } catch {
+        errorMessage = `Erreur HTTP ${response.status}`;
       }
-    };
-    fetchData();
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    setSalaires(data.salaires || []);
+    setFilteredSalaires(data.salaires || []);
+  } catch (error: any) {
+    console.error('Erreur chargement salaires:', error);
+    setMessage(error.message || 'Impossible de charger les salaires.');
+  }
+};
+
+  const fetchEmployes = async () => {
+    try {
+      const response = await fetch('/api/employes', {
+        headers: { 'authorization': `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setEmployes(data.employes as Employe[]);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des employés:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (loading || !token) return;
+    fetchSalaires();
+    fetchEmployes();
   }, [token, loading]);
 
   useEffect(() => {
     let updatedSalaires = [...salaires];
     if (filters.mois) {
-      updatedSalaires = updatedSalaires.filter((s) =>
-        s.mois.toISOString().slice(0, 7) === new Date(filters.mois).toISOString().slice(0, 7)
-      );
+      updatedSalaires = updatedSalaires.filter((s) => new Date(s.mois).toISOString().slice(0, 7) === filters.mois);
     }
     if (filters.statut) {
       updatedSalaires = updatedSalaires.filter((s) => s.statut === filters.statut);
     }
     setFilteredSalaires(updatedSalaires);
   }, [filters, salaires]);
-
-  useEffect(() => {
-    document.querySelector('.salaire-message')?.classList.add('animate-fadeIn');
-  }, [message]);
 
   if (loading) return <p className="text-center mt-10">Chargement...</p>;
 
@@ -152,12 +282,12 @@ export default function SalairesPage() {
       <div className="w-full max-w-2xl space-y-8">
         <h1 className="text-3xl font-bold text-center text-blue-600 mb-6">Gestion des salaires</h1>
         {message && (
-          <div className="salaire-message text-green-600 text-center p-2 bg-green-100 rounded-lg">
+          <div className="text-green-600 text-center p-2 bg-green-100 rounded-lg">
             {message}
           </div>
         )}
         <section className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-black">Enregistrer un salaire</h2>
+          <h2 className="text-xl font-semibold mb-4 text-black">Enregistrer ou modifier un salaire</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-bold text-black">Employé</label>
@@ -240,9 +370,10 @@ export default function SalairesPage() {
                 className="w-full p-2 border rounded text-black"
                 required
               >
-                <option value="En attente">En attente</option>
+                <option value="En attente de validation">En attente de validation</option>
+                <option value="En attente d'acceptation employe">En attente d'acceptation employé</option>
                 <option value="Paye">Payé</option>
-                <option value="Salaire non reçu">Salaire non reçu</option>
+                <option value="Rejeté">Rejeté</option>
               </select>
             </div>
             <button
@@ -250,33 +381,23 @@ export default function SalairesPage() {
               className={`w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={isSubmitting}
             >
-              {isSubmitting ? (
-                <span className="flex items-center justify-center">
-                  <svg
-                    className="animate-spin h-5 w-5 mr-2 text-white"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Enregistrement en cours...
-                </span>
-              ) : (
-                'Enregistrer'
-              )}
+              {isSubmitting ? 'Enregistrement...' : selectedSalaire ? 'Modifier' : 'Enregistrer'}
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateMonthly}
+              className={`w-full bg-purple-600 text-white p-2 rounded hover:bg-purple-700 transition-colors mt-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Calcul...' : 'Calculer salaires du mois pour tous'}
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateForEmploye}
+              className={`w-full bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700 transition-colors mt-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={isSubmitting || !formData.employeId || !formData.mois}
+            >
+              {isSubmitting ? 'Calcul...' : 'Calculer pour cet employé'}
             </button>
           </form>
         </section>
@@ -302,23 +423,42 @@ export default function SalairesPage() {
                 className="w-full p-2 border rounded text-black"
               >
                 <option value="">Tous</option>
-                <option value="En attente">En attente</option>
+                <option value="En attente de validation">En attente de validation</option>
+                <option value="En attente d'acceptation employe">En attente d'acceptation employé</option>
                 <option value="Paye">Payé</option>
-                <option value="Salaire non reçu">Salaire non reçu</option>
+                <option value="Rejeté">Rejeté</option>
               </select>
             </div>
           </div>
           <ul className="space-y-2">
             {filteredSalaires.map((salaire) => (
-              <li key={salaire.id} className="p-2 bg-gray-100 rounded text-black">
+              <li key={salaire.id} className="p-2 bg-gray-100 rounded text-black flex justify-between items-center">
                 {employes.find((e) => e.id === salaire.employeId)?.prenom || 'Inconnu'} {employes.find((e) => e.id === salaire.employeId)?.nom || ''} - 
-                Mois: {salaire.mois.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} - 
+                Mois: {new Date(salaire.mois).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })} - 
                 Salaire de base: {salaire.salaireBase.toFixed(2)}€ - 
                 Primes: {salaire.primes.toFixed(2)}€ - 
                 Déductions: {salaire.deductions.toFixed(2)}€ - 
                 Total: {(salaire.salaireBase + salaire.primes - salaire.deductions).toFixed(2)}€ - 
                 Statut: {salaire.statut} - 
-                Paiement: {salaire.datePaiement?.toLocaleDateString('fr-FR') || 'N/A'}
+                Paiement: {salaire.datePaiement ? new Date(salaire.datePaiement).toLocaleDateString('fr-FR') : 'N/A'}
+                <div className="ml-4 space-x-2">
+                  <button
+                    onClick={() => handleEdit(salaire)}
+                    className="text-blue-600 hover:underline text-sm"
+                  >
+                    Modifier
+                  </button>
+                  {/* Dans le tableau */}
+                    {salaire.statut === 'En attente de validation' && (
+                      <button
+                        onClick={() => handleValidatePayment(salaire.id)}
+                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
+                        disabled={isSubmitting}
+                      >
+                        Valider Paiement
+                      </button>
+                    )}
+                </div>
               </li>
             ))}
           </ul>

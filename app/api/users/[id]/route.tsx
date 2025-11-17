@@ -1,3 +1,4 @@
+// app/api/users/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
@@ -8,23 +9,16 @@ const prisma = new PrismaClient();
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = req.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Token Bearer requis' }, { status: 401 });
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Token requis' }, { status: 401 });
     }
+
     const token = authHeader.split(' ')[1];
-    console.log('Token reçu dans GET:', token);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret') as { id: number };
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret') as {
-      id: number;
-      email: string;
-      role: string;
-      prenom: string;
-    };
-
-    // Attendre les paramètres dynamiques
     const params = await context.params;
-    if (parseInt(params.id) !== decoded.id) {
-      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    if (Number(params.id) !== decoded.id) {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
     }
 
     const utilisateur = await prisma.utilisateur.findUnique({
@@ -32,62 +26,79 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       include: { employe: true },
     });
 
-    if (!utilisateur) {
-      return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 });
+    if (!utilisateur?.employe) {
+      return NextResponse.json({ error: 'Profil employé non trouvé' }, { status: 404 });
     }
 
-    // Masquer le mot de passe pour la réponse
-    const { motDePasse, ...userData } = utilisateur;
-    return NextResponse.json({ user: userData }, { status: 200 });
+    return NextResponse.json({
+      user: {
+        id: utilisateur.id,
+        email: utilisateur.email,
+        prenom: utilisateur.employe.prenom,
+        nom: utilisateur.employe.nom,
+      },
+    });
   } catch (error) {
-    console.error('Erreur lors de la récupération de l\'utilisateur:', error);
-    return NextResponse.json({ error: 'Erreur lors de la récupération des données' }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
+    console.error('Erreur GET /api/users/[id]:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = req.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Token Bearer requis' }, { status: 401 });
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Token requis' }, { status: 401 });
     }
+
     const token = authHeader.split(' ')[1];
-    console.log('Token reçu dans PATCH:', token);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret') as { id: number };
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret') as {
-      id: number;
-      email: string;
-      role: string;
-      prenom: string;
-    };
-
-    // Attendre les paramètres dynamiques
     const params = await context.params;
-    if (parseInt(params.id) !== decoded.id) {
-      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    if (Number(params.id) !== decoded.id) {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
     }
 
     const { prenom, nom, email, motDePasse } = await req.json();
 
-    const updatedData: any = { prenom, nom, email };
-    if (motDePasse) {
-      updatedData.motDePasse = await bcrypt.hash(motDePasse, 10);
-    }
-
-    const utilisateur = await prisma.utilisateur.update({
-      where: { id: decoded.id },
-      data: updatedData,
+    // Vérifie que l'employé existe
+    const employe = await prisma.employe.findFirst({
+      where: { utilisateurId: decoded.id },
     });
 
-    // Masquer le mot de passe pour la réponse
-    const { motDePasse: _, ...userData } = utilisateur;
-    return NextResponse.json({ message: 'Profil mis à jour avec succès', user: userData }, { status: 200 });
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
-    return NextResponse.json({ error: 'Erreur lors de la mise à jour du profil' }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
+    if (!employe) {
+      return NextResponse.json({ error: 'Employé non trouvé' }, { status: 404 });
+    }
+
+    // Mise à jour dans `employe` et `utilisateur`
+    const [updatedEmploye, updatedUtilisateur] = await prisma.$transaction([
+      prisma.employe.update({
+        where: { id: employe.id },
+        data: { prenom, nom },
+      }),
+      prisma.utilisateur.update({
+        where: { id: decoded.id },
+        data: {
+          email,
+          ...(motDePasse && { motDePasse: await bcrypt.hash(motDePasse, 10) }),
+        },
+      }),
+    ]);
+
+    return NextResponse.json({
+      message: 'Profil mis à jour avec succès',
+      user: {
+        id: updatedUtilisateur.id,
+        email: updatedUtilisateur.email,
+        prenom: updatedEmploye.prenom,
+        nom: updatedEmploye.nom,
+      },
+    });
+  } catch (error: any) {
+    console.error('Erreur PATCH /api/users/[id]:', error);
+    return NextResponse.json(
+      { error: error.message || 'Erreur lors de la mise à jour' },
+      { status: 500 }
+    );
   }
 }
