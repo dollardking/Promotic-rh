@@ -49,10 +49,10 @@ export default function Navbar() {
               <div className="py-3">
                 {!isLoggedIn ? (
                   <>
-                    <Link href="/inscription" className="flex items-center gap-3 px-6 py-4 text-white hover:bg-white/10 transition" onClick={() => setDropdownOpen(false)}>
+                    <Link href="/register" className="flex items-center gap-3 px-6 py-4 text-white hover:bg-white/10 transition" onClick={() => setDropdownOpen(false)}>
                       <UserPlus className="w-5 h-5" /> S'inscrire
                     </Link>
-                    <Link href="/connexion" className="flex items-center gap-3 px-6 py-4 text-white hover:bg-white/10 transition border-t border-white/10" onClick={() => setDropdownOpen(false)}>
+                    <Link href="/login" className="flex items-center gap-3 px-6 py-4 text-white hover:bg-white/10 transition border-t border-white/10" onClick={() => setDropdownOpen(false)}>
                       <LogIn className="w-5 h-5" /> Se connecter
                     </Link>
                   </>
