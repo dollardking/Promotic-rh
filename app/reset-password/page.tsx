@@ -1,146 +1,124 @@
-'use client'; // Ajoute cette directive en haut pour forcer le rendu côté client
-
-import { useState, FormEvent, useEffect } from 'react';
+'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [token, setToken] = useState<string>(''); // État pour stocker le token
+  const [token, setToken] = useState('');
 
-  // Extraire le token côté client uniquement
+  // Récupère le token depuis l'URL
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const extractedToken = urlParams.get('token') || '';
-    setToken(extractedToken);
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('token');
+    if (t) setToken(t);
   }, []);
 
-  const validateForm = () => {
-    const newErrors: string[] = [];
-    if (!password) newErrors.push('Le mot de passe est requis.');
-    else if (password.length < 6) newErrors.push('Le mot de passe doit avoir au moins 6 caractères.');
-    if (!confirmPassword) newErrors.push('La confirmation du mot de passe est requise.');
-    else if (password !== confirmPassword) newErrors.push('Les mots de passe ne correspondent pas.');
-    return newErrors.length > 0 ? newErrors.join(' ') : null;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      setSuccess(null);
+  // Validation en temps réel
+  useEffect(() => {
+    if (password && password.length < 6) {
+      setError('Minimum 6 caractères');
+    } else if (confirmPassword && password !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
     } else {
-      setError(null);
-      setIsSubmitting(true);
-      try {
-        if (!token) throw new Error('Token manquant dans l\'URL.');
-        const response = await fetch('/api/reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, password }),
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Erreur lors de la réinitialisation.');
-        setSuccess(data.message);
-        setTimeout(() => window.location.href = '/login', 2000);
-      } catch (error) {
-        setError((error as Error).message);
-      } finally {
-        setIsSubmitting(false);
-      }
+      setError('');
+    }
+  }, [password, confirmPassword]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password || password.length < 6) {
+      setError('Mot de passe trop court');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
+      return;
+    }
+    if (!token) {
+      setError('Token manquant');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
+      setSuccess('Mot de passe changé avec succès ! Redirection...');
+      setTimeout(() => window.location.href = '/login', 2000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 z-0">
-        <div className="absolute w-1/5 h-1/5 bg-blue-700 rounded-full animate-float" style={{ top: '10%', left: '5%' }}></div>
-        <div className="absolute w-1/4 h-1/4 bg-blue-400 rounded-lg animate-float-delayed" style={{ top: '30%', right: '5%' }}></div>
-        <div className="absolute w-1/3 h-1/3 bg-blue-500 rounded-full animate-float" style={{ bottom: '20%', left: '10%' }}></div>
-        <div className="absolute w-1/6 h-1/6 bg-blue-800 rounded-md animate-float-delayed" style={{ bottom: '10%', right: '15%' }}></div>
-        <div className="absolute w-1/7 h-1/7 bg-blue-600 rounded-xl animate-float" style={{ top: '50%', left: '25%' }}></div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md z-10 relative">
-        <h1 className="text-2xl font-bold mb-4 text-center">Nouveau mot de passe</h1>
-        <form className="space-y-4" onSubmit={handleSubmit}>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="absolute inset-0 bg-black/40" />
+
+      <div className="relative z-10 bg-white/10 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/20 w-full max-w-md">
+        <h1 className="text-4xl font-black text-white text-center mb-8">
+          Nouveau mot de passe
+        </h1>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="password" className="block text-sm text-black font-bold">
-              Nouveau mot de passe
-            </label>
             <input
               type="password"
-              id="password"
               value={password}
-              onChange={(e) => setPassword(e.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder="••••••••"
-              style={{ color: '#666' }}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Nouveau mot de passe"
+              className={`w-full px-5 py-4 rounded-xl bg-white/10 border-2 text-white placeholder-white/50 transition-all duration-300 focus:outline-none ${
+                error && password 
+                  ? 'border-red-500 focus:border-red-400' 
+                  : password.length >= 6 
+                    ? 'border-green-500' 
+                    : 'border-white/30 focus:border-white/60'
+              }`}
             />
           </div>
+
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm text-black font-bold">
-              Confirmer le mot de passe
-            </label>
             <input
               type="password"
-              id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder="••••••••"
-              style={{ color: '#666' }}
+              placeholder="Confirmer le mot de passe"
+              className={`w-full px-5 py-4 rounded-xl bg-white/10 border-2 text-white placeholder-white/50 transition-all duration-300 focus:outline-none ${
+                error && confirmPassword 
+                  ? 'border-red-500 focus:border-red-400' 
+                  : confirmPassword && password === confirmPassword 
+                    ? 'border-green-500' 
+                    : 'border-white/30 focus:border-white/60'
+              }`}
             />
-            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
-            {success && <p className="text-green-500 text-sm mt-1">{success}</p>}
+            {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+            {success && <p className="text-green-400 text-sm mt-2">{success}</p>}
           </div>
+
           <button
             type="submit"
-            className={`w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 transition-all duration-300 ${
-              isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            disabled={isSubmitting || !!error}
+            disabled={isSubmitting || !!error || !password || !confirmPassword}
+            className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xl rounded-xl shadow-lg hover:shadow-purple-500/50 transform hover:scale-105 transition disabled:opacity-60"
           >
-            {isSubmitting ? (
-              <span className="flex items-center justify-center">
-                <svg
-                  className="animate-spin h-5 w-5 mr-2 text-white"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Réinitialisation en cours...
-              </span>
-            ) : (
-              'Réinitialiser le mot de passe'
-            )}
+            {isSubmitting ? 'Sauvegarde...' : 'Changer le mot de passe'}
           </button>
         </form>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Retourner à la{' '}
-          <Link href="/login" className="text-indigo-600 hover:underline">
-            connexion
+
+        <p className="mt-6 text-center text-white/70">
+          <Link href="/login" className="text-purple-300 hover:text-white font-bold underline">
+            Retour à la connexion
           </Link>
-          ?
         </p>
       </div>
     </div>

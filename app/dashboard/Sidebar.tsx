@@ -21,8 +21,8 @@ export default function Sidebar({ logout, user }: SidebarProps) {
     { href: '/dashboard/presences', label: 'Présences / Absences', icon: '📊' },
     { href: '/dashboard/salaires', label: 'Paie / Salaires', icon: '💰' },
     { href: '/dashboard/notifications', label: 'Notifications', icon: '🔔' },
-    { href: '/dashboard/parametres', label: 'Paramètres', icon: '⚙️' },
     { href: '/dashboard/profil', label: 'Profil', icon: '👤' },
+    { href: '/dashboard/parametres', label: 'Paramètres', icon: '⚙️' },
   ];
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,7 +43,7 @@ export default function Sidebar({ logout, user }: SidebarProps) {
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-blue-600 to-indigo-800 text-white p-6 flex flex-col justify-between shadow-xl transition-all duration-300">
       <div>
-        <h2 className="text-2xl font-bold mb-8 text-center animate-pulse">Promotic RH</h2>
+        <h2 className="text-2xl font-bold mb-8 text-center animate-pulse">promotic_RH</h2>
         <nav className="space-y-4">
           {links.map((link) => (
             <Link
@@ -70,45 +70,55 @@ export default function Sidebar({ logout, user }: SidebarProps) {
         </button>
       </div>
 
-      <Modal
-        isOpen={isModalOpen}
-        onRequestClose={cancelLogout}
-        style={{
-          content: {
-            top: '50%',
-            left: '50%',
-            right: 'auto',
-            bottom: 'auto',
-            marginRight: '-50%',
-            transform: 'translate(-50%, -50%)',
-            padding: '20px',
-            borderRadius: '8px',
-            backgroundColor: '#fff',
-            color: '#000',
-          },
-          overlay: {
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          },
-        }}
-        contentLabel="Confirmation de déconnexion"
+        <Modal
+    isOpen={isModalOpen}
+    onRequestClose={cancelLogout}
+    style={{
+      content: {
+        top: '50%',
+        left: '50%',
+        right: 'auto',
+        bottom: 'auto',
+        marginRight: '-50%',
+        transform: 'translate(-50%, -50%)',
+        padding: '30px',
+        borderRadius: '16px',
+        backgroundColor: '#1e1b4b',
+        color: '#fff',
+        border: '2px solid #a78bfa',
+        maxWidth: '400px',
+        width: '90%',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.7)',
+        zIndex: 9999, // LE PLUS IMPORTANT
+      },
+      overlay: {
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        zIndex: 9998, // Encore plus haut que tout
+      },
+    }}
+    contentLabel="Confirmation de déconnexion"
+  >
+    <h2 className="text-2xl font-black mb-6 text-purple-400 text-center">
+      Confirmer la déconnexion ?
+    </h2>
+    <p className="mb-8 text-white/90 text-center">
+      Êtes-vous sûr de vouloir quitter Promotic RH ?
+    </p>
+    <div className="flex justify-center space-x-6">
+      <button
+        onClick={cancelLogout}
+        className="px-8 py-4 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition font-bold"
       >
-        <h2 className="text-xl font-bold mb-4">Confirmer la déconnexion</h2>
-        <p className="mb-4">Êtes-vous sûr de vouloir vous déconnecter ?</p>
-        <div className="flex justify-end space-x-4">
-          <button
-            onClick={cancelLogout}
-            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={confirmLogout}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Déconnexion
-          </button>
-        </div>
-      </Modal>
+        Annuler
+      </button>
+      <button
+        onClick={confirmLogout}
+        className="px-8 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:shadow-red-500/50 transition font-black transform hover:scale-105"
+      >
+        Oui, déconnexion
+      </button>
+    </div>
+  </Modal>
     </aside>
   );
 }

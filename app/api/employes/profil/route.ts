@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -14,11 +15,10 @@ export async function GET(req: NextRequest) {
   const token = authHeader.split(' ')[1];
 
   try {
-    // LE BON CHAMP DANS LE TOKEN EST `id`
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: number };
 
     const employe = await prisma.employe.findFirst({
-      where: { utilisateurId: decoded.id }, // ← ICI : `decoded.id`
+      where: { utilisateurId: decoded.id },
       include: {
         departement: { select: { nomDepartement: true } },
       },
@@ -44,24 +44,74 @@ export async function PUT(req: NextRequest) {
   }
 
   const token = authHeader.split(' ')[1];
-  const { telephone, dateEmbauche, dateDepart, competences } = await req.json();
+  const body = await req.json();
+  const {
+    prenom,
+    nom,
+    email,
+    motDePasse,
+    telephone,
+    dateEmbauche,
+    dateDepart,
+    competences
+  } = body;
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: number };
 
-    const updated = await prisma.employe.update({
+    // 1. Trouver l'employé
+    const employe = await prisma.employe.findFirst({
       where: { utilisateurId: decoded.id },
+      include: { utilisateur: true },
+    });
+
+    if (!employe) {
+      return NextResponse.json({ error: 'Profil non trouvé' }, { status: 404 });
+    }
+
+    // 2. Mettre à jour l'employé
+    const updatedEmploye = await prisma.employe.update({
+      where: { id: employe.id },
       data: {
-        telephone,
-        dateEmbauche: dateEmbauche ? new Date(dateEmbauche) : null,
-        dateDepart: dateDepart ? new Date(dateDepart) : null,
-        competences,
+        prenom,
+        nom,
+        email,
+        telephone: telephone || employe.telephone,
+        dateEmbauche: dateEmbauche ? new Date(dateEmbauche) : employe.dateEmbauche,
+        dateDepart: dateDepart ? new Date(dateDepart) : employe.dateDepart,
+        competences: competences || employe.competences,
       },
     });
 
-    return NextResponse.json({ employe: updated }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Échec mise à jour' }, { status: 400 });
+    // 3. Mettre à jour l'utilisateur (email + mot de passe)
+    const userData: any = {
+      email,
+    };
+
+    if (motDePasse) {
+      const hashedPassword = await bcrypt.hash(motDePasse, 10);
+      userData.motDePasse = hashedPassword;
+    }
+
+    const updatedUtilisateur = await prisma.utilisateur.update({
+      where: { id: decoded.id },
+      data: userData,
+    });
+
+    return NextResponse.json({
+      message: 'Profil mis à jour avec succès !',
+      employe: updatedEmploye,
+      utilisateur: {
+        email: updatedUtilisateur.email
+      }
+    }, { status: 200 });
+
+  } catch (error: any) {
+    console.error('Erreur mise à jour profil:', error);
+    return NextResponse.json(
+      { error: error.message || 'Échec mise à jour' },
+      { status: 500 }
+    );
   } finally {
     await prisma.$disconnect();
   }

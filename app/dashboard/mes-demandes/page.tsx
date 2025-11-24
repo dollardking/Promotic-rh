@@ -1,117 +1,132 @@
 'use client';
-
 import { useAuth } from '../../../lib/useAuth';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+interface Conge {
+  id: number;
+  startDate: string;
+  endDate: string;
+  type: 'conge' | 'permission';
+  reason: string;
+  status: 'En attente' | 'Approuvé' | 'Rejeté';
+  createdAt: string;
+}
+
 export default function MesDemandesPage() {
   const { token, loading } = useAuth();
-  const [conges, setConges] = useState([]);
+  const [conges, setConges] = useState<Conge[]>([]);
   const [message, setMessage] = useState('');
   const router = useRouter();
 
   useEffect(() => {
+    if (!token || loading) return;
+
     const fetchConges = async () => {
-      if (loading || !token) {
-        console.log('Chargement en cours ou token absent:', { loading, token });
-        return;
-      }
       try {
-        const response = await fetch('/api/conges', {
-          headers: {
-            'authorization': `Bearer ${token}`,
-          },
+        const res = await fetch('/api/conges', {
+          headers: { authorization: `Bearer ${token}` }
         });
-        const data = await response.json();
-        if (response.ok) {
-          setConges(data.conges || []);
-        } else {
-          setMessage('Erreur lors de la récupération des demandes.');
-          console.error('Erreur API:', data.error);
-        }
+        const data = await res.json();
+        if (res.ok) setConges(data.conges || []);
       } catch (error) {
-        setMessage('Erreur lors de la récupération des demandes.');
-        console.error('Erreur fetch:', error);
+        console.error('Erreur lors du chargement des congés:', error);
       }
     };
-
     fetchConges();
   }, [token, loading]);
 
-  useEffect(() => {
-    document.querySelector('.demande-message')?.classList.add('animate-fadeIn');
-  }, [message]);
-
   const handleDelete = async (id: number) => {
-    if (!token) return;
+    if (!confirm('Voulez-vous vraiment annuler cette demande ?')) return;
+
     try {
-      const response = await fetch(`/api/conges/${id}`, {
+      const res = await fetch(`/api/conges/${id}`, {
         method: 'DELETE',
-        headers: {
-          'authorization': `Bearer ${token}`,
-        },
+        headers: { authorization: `Bearer ${token}` }
       });
-      const data = await response.json();
-      if (response.ok) {
-        setConges(conges.filter((conge: any) => conge.id !== id));
-        setMessage(data.message);
+
+      if (res.ok) {
+        setConges(prev => prev.filter(c => c.id !== id));
+        setMessage('Demande annulée avec succès');
         setTimeout(() => setMessage(''), 3000);
-      } else {
-        setMessage(data.error || 'Erreur lors de l\'annulation.');
       }
     } catch (error) {
-      setMessage('Erreur lors de l\'annulation.');
-      console.error('Erreur fetch:', error);
+      console.error('Erreur lors de la suppression:', error);
     }
   };
 
-  const handleModify = (id: number) => {
-    router.push(`/dashboard/modifier-demande/${id}`);
-  };
-
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="text-white text-2xl">Chargement de vos demandes...</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="w-full max-w-2xl space-y-8">
-        <h1 className="text-3xl font-bold text-center text-blue-600 mb-6">Mes Demandes</h1>
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 relative overflow-hidden">
+      <div className="absolute inset-0 bg-black/50" />
+      
+      <div className="relative z-10 p-6 max-w-5xl mx-auto">
+        <h1 className="text-5xl font-black text-white text-center mb-12 drop-shadow-2xl">
+          Mes Demandes
+        </h1>
+
         {message && (
-          <div className="demande-message text-green-600 text-center p-2 bg-green-100 rounded-lg">
+          <div className="mb-8 p-6 rounded-2xl text-center font-bold text-xl bg-green-500/20 border-2 border-green-400 text-green-300">
             {message}
           </div>
         )}
-        <section className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-black">Liste des Demandes</h2>
-          <ul className="space-y-2">
-            {conges.length === 0 ? (
-              <li className="p-2 text-center text-gray-500">Aucune demande pour le moment.</li>
-            ) : (
-              conges.map((conge: any) => (
-                <li key={conge.id} className="p-2 bg-gray-100 rounded text-black flex justify-between items-center">
-                  <span>
-                    {conge.type} - {new Date(conge.startDate).toLocaleDateString()} au {new Date(conge.endDate).toLocaleDateString()} - {conge.status}
-                  </span>
-                  {conge.status === 'En attente' && (
-                    <div>
-                      <button
-                        onClick={() => handleModify(conge.id)}
-                        className="bg-blue-600 text-white p-1 rounded hover:bg-blue-700 mr-2"
-                      >
-                        Modifier
-                      </button>
-                      <button
-                        onClick={() => handleDelete(conge.id)}
-                        className="bg-red-600 text-white p-1 rounded hover:bg-red-700"
-                      >
-                        Annuler
-                      </button>
-                    </div>
-                  )}
-                </li>
-              ))
-            )}
-          </ul>
-        </section>
+
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-10 border border-white/20 shadow-2xl">
+          {conges.length === 0 ? (
+            <p className="text-white/70 text-center text-xl py-20">
+              Aucune demande pour le moment
+            </p>
+          ) : (
+            <div className="space-y-6">
+              {conges.map((conge) => (
+                <div key={conge.id} className="bg-white/10 rounded-2xl p-6 border border-white/20 flex justify-between items-center hover:bg-white/20 transition">
+                  <div className="text-white">
+                    <p className="text-2xl font-bold">
+                      {conge.type === 'conge' ? 'Congé' : 'Permission'}
+                    </p>
+                    <p className="text-lg opacity-90">
+                      Du {new Date(conge.startDate).toLocaleDateString('fr-FR')} 
+                      au {new Date(conge.endDate).toLocaleDateString('fr-FR')}
+                    </p>
+                    <p className="text-sm opacity-70 mt-2">{conge.reason}</p>
+                  </div>
+
+                  <div className="text-right">
+                    <span className={`inline-block px-6 py-3 rounded-full text-lg font-bold ${
+                      conge.status === 'En attente' ? 'bg-yellow-500/30 text-yellow-300' :
+                      conge.status === 'Approuvé' ? 'bg-green-500/30 text-green-300' :
+                      'bg-red-500/30 text-red-300'
+                    }`}>
+                      {conge.status}
+                    </span>
+
+                    {conge.status === 'En attente' && (
+                      <div className="mt-4 space-x-3">
+                        <button
+                          onClick={() => router.push(`/dashboard/modifier-demande/${conge.id}`)}
+                          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl font-bold hover:scale-105 transition"
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          onClick={() => handleDelete(conge.id)}
+                          className="px-6 py-3 bg-red-600 rounded-xl font-bold hover:scale-105 transition"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

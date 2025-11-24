@@ -1,118 +1,96 @@
 'use client';
-
-import { useState, FormEvent } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); // État pour le spinner
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const validateEmail = () => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim()) return 'L\'email est requis.';
-    if (!emailRegex.test(email)) return 'L\'email n\'est pas valide.';
-    return null;
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const validationError = validateEmail();
-    if (validationError) {
-      setError(validationError);
-      setSuccess(null);
+  // Validation en temps réel
+  useEffect(() => {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Email invalide');
     } else {
-      setError(null);
-      setIsSubmitting(true); // Active le spinner
-      try {
-        const response = await fetch('/api/forgot-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Erreur lors de l\'envoi.');
-        setSuccess(data.message);
-      } catch (error) {
-        setError((error as Error).message);
-      } finally {
-        setIsSubmitting(false); // Désactive le spinner
-      }
+      setError('');
+    }
+  }, [email]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setError("L'email est requis");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Email invalide');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur d'envoi");
+      setSuccess("Lien de réinitialisation envoyé ! Vérifiez vos emails");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 z-0">
-        <div className="absolute w-1/5 h-1/5 bg-blue-700 rounded-full animate-float" style={{ top: '10%', left: '5%' }}></div>
-        <div className="absolute w-1/4 h-1/4 bg-blue-400 rounded-lg animate-float-delayed" style={{ top: '30%', right: '5%' }}></div>
-        <div className="absolute w-1/3 h-1/3 bg-blue-500 rounded-full animate-float" style={{ bottom: '20%', left: '10%' }}></div>
-        <div className="absolute w-1/6 h-1/6 bg-blue-800 rounded-md animate-float-delayed" style={{ bottom: '10%', right: '15%' }}></div>
-        <div className="absolute w-1/7 h-1/7 bg-blue-600 rounded-xl animate-float" style={{ top: '50%', left: '25%' }}></div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md z-10 relative">
-        <h1 className="text-2xl font-bold mb-4 text-center">Réinitialiser le mot de passe</h1>
-        <form className="space-y-4" onSubmit={handleSubmit}>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="absolute inset-0 bg-black/40" />
+
+      <div className="relative z-10 bg-white/10 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/20 w-full max-w-md">
+        <h1 className="text-4xl font-black text-white text-center mb-8">
+          Mot de passe oublié ?
+        </h1>
+        <p className="text-white/70 text-center mb-8">
+          Entrez votre email, on vous envoie un lien de réinitialisation
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm text-black font-bold">
-              Email
-            </label>
             <input
               type="email"
-              id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder="tonemail@example.com"
-              style={{ color: '#666' }}
+              placeholder="tonemail@exemple.com"
+              className={`w-full px-5 py-4 rounded-xl bg-white/10 border-2 text-white placeholder-white/50 transition-all duration-300 focus:outline-none ${
+                error 
+                  ? 'border-red-500 focus:border-red-400' 
+                  : email && !error 
+                    ? 'border-green-500 focus:border-green-400' 
+                    : 'border-white/30 focus:border-white/60'
+              }`}
             />
-            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
-            {success && <p className="text-green-500 text-sm mt-1">{success}</p>}
+            {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+            {success && <p className="text-green-400 text-sm mt-2">{success}</p>}
           </div>
+
           <button
             type="submit"
-            className={`w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 transition-all duration-300 ${
-              isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
             disabled={isSubmitting || !!error}
+            className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xl rounded-xl shadow-lg hover:shadow-purple-500/50 transform hover:scale-105 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? (
-              <span className="flex items-center justify-center">
-                <svg
-                  className="animate-spin h-5 w-5 mr-2 text-white"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Envoi en cours...
-              </span>
-            ) : (
-              'Envoyer la demande'
-            )}
+            {isSubmitting ? 'Envoi en cours...' : 'Envoyer le lien'}
           </button>
         </form>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Retourner à la{' '}
-          <Link href="/login" className="text-indigo-600 hover:underline">
+
+        <p className="mt-6 text-center text-white/70">
+          Retour à la{' '}
+          <Link href="/login" className="text-purple-300 hover:text-white font-bold underline">
             connexion
           </Link>
-          ?
         </p>
       </div>
     </div>

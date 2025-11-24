@@ -1,191 +1,186 @@
 'use client';
-
 import { useAuth } from '../../../../lib/useAuth';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+
+interface FormData {
+  startDate: string;
+  endDate: string;
+  type: 'conge' | 'permission';
+  reason: string;
+}
 
 export default function ModifierDemandePage() {
   const { token, loading } = useAuth();
   const { id } = useParams();
   const router = useRouter();
-  const [formData, setFormData] = useState({ startDate: '', endDate: '', type: 'conge', reason: '' });
+
+  const [formData, setFormData] = useState<FormData>({
+    startDate: '',
+    endDate: '',
+    type: 'conge',
+    reason: ''
+  });
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!token || loading || !id) return;
+
     const fetchConge = async () => {
-      if (loading || !token) {
-        console.log('Chargement en cours ou token absent:', { loading, token });
-        return;
-      }
       try {
-        const response = await fetch(`/api/conges/${id}`, {
-          headers: {
-            'authorization': `Bearer ${token}`,
-          },
+        const res = await fetch(`/api/conges/${id}`, {
+          headers: { authorization: `Bearer ${token}` }
         });
-        const data = await response.json();
-        console.log('Données reçues de l\'API:', data); // Log pour débogage
-        if (response.ok) {
-          const conge = data.conge;
+        const data = await res.json();
+
+        if (res.ok && data.conge) {
           setFormData({
-            startDate: conge.startDate instanceof Date ? conge.startDate.toISOString().split('T')[0] : conge.startDate,
-            endDate: conge.endDate instanceof Date ? conge.endDate.toISOString().split('T')[0] : conge.endDate,
-            type: conge.type,
-            reason: conge.reason,
+            startDate: data.conge.startDate.split('T')[0],
+            endDate: data.conge.endDate.split('T')[0],
+            type: data.conge.type,
+            reason: data.conge.reason
           });
         } else {
-          setMessage('Erreur lors de la récupération de la demande.');
-          console.error('Erreur API:', data.error);
+          setMessage('Demande non trouvée ou déjà traitée');
         }
-      } catch (error) {
-        setMessage('Erreur lors de la récupération de la demande.');
-        console.error('Erreur fetch:', error);
+      } catch (err) {
+        setMessage('Erreur de chargement de la demande');
       }
     };
 
     fetchConge();
-  }, [token, loading, id]);
+  }, [id, token, loading]);
 
-  useEffect(() => {
-    document.querySelector('.modifier-message')?.classList.add('animate-fadeIn');
-  }, [message]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
     setIsSubmitting(true);
+
     try {
-      const response = await fetch(`/api/conges/${id}`, {
+      const res = await fetch(`/api/conges/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${token}`,
+          authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(formData)
       });
-      const data = await response.json();
-      if (response.ok) {
-        setMessage(data.message);
-        setTimeout(() => {
-          setMessage('');
-          router.push('/dashboard/mes-demandes');
-        }, 3000);
+
+      if (res.ok) {
+        setMessage('Demande modifiée avec succès ! Redirection...');
+        setTimeout(() => router.push('/dashboard/mes-demandes'), 2000);
       } else {
-        setMessage(data.error || 'Erreur lors de la modification.');
+        const error = await res.json();
+        setMessage(error.error || 'Erreur lors de la modification');
       }
-    } catch (error) {
-      setMessage('Erreur lors de la modification.');
-      console.error('Erreur fetch:', error);
+    } catch {
+      setMessage('Erreur réseau');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="text-white text-2xl">Chargement...</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="w-full max-w-2xl space-y-8">
-        <h1 className="text-3xl font-bold text-center text-blue-600 mb-6">Modifier la Demande</h1>
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 relative overflow-hidden">
+      <div className="absolute inset-0 bg-black/50" />
+      
+      <div className="relative z-10 p-6 max-w-2xl mx-auto">
+        <h1 className="text-5xl font-black text-white text-center mb-12 drop-shadow-2xl">
+          Modifier ma demande
+        </h1>
+
         {message && (
-          <div className="modifier-message text-green-600 text-center p-2 bg-green-100 rounded-lg">
+          <div className={`mb-8 p-6 rounded-2xl text-center font-bold text-xl transition-all ${
+            message.includes('succès') 
+              ? 'bg-green-500/20 border-2 border-green-400 text-green-300' 
+              : 'bg-red-500/20 border-2 border-red-400 text-red-300'
+          }`}>
             {message}
           </div>
         )}
-        <section className="bg-white p-6 rounded-lg shadow-md">
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur-xl rounded-3xl p-10 border border-white/20 shadow-2xl space-y-8">
+          <div className="grid md:grid-cols-2 gap-8">
             <div>
-              <label className="block text-sm font-bold text-black">Date de début</label>
+              <label className="text-white/80 text-lg font-medium">Date de début</label>
               <input
                 type="date"
                 name="startDate"
                 value={formData.startDate}
                 onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
                 required
+                className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition"
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-black">Date de fin</label>
+              <label className="text-white/80 text-lg font-medium">Date de fin</label>
               <input
                 type="date"
                 name="endDate"
                 value={formData.endDate}
                 onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
                 required
+                className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition"
               />
             </div>
-            <div>
-              <label className="block text-sm font-bold text-black">Type</label>
-              <select
-                name="type"
-                value={formData.type}
-                onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
-              >
-                <option value="conge">Congé</option>
-                <option value="permission">Permission</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-black">Raison</label>
-              <textarea
-                name="reason"
-                value={formData.reason}
-                onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
-                required
-              />
-            </div>
+          </div>
+
+          <div>
+            <label className="text-white/80 text-lg font-medium">Type</label>
+            <select
+              name="type"
+              value={formData.type}
+              onChange={handleChange}
+              className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white focus:border-purple-400 focus:outline-none transition"
+            >
+              <option value="conge" className="bg-gray-800">Congé annuel</option>
+              <option value="permission" className="bg-gray-800">Permission</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-white/80 text-lg font-medium">Raison / Motif</label>
+            <textarea
+              name="reason"
+              value={formData.reason}
+              onChange={handleChange}
+              rows={6}
+              required
+              className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition resize-none"
+            />
+          </div>
+
+          <div className="flex gap-4">
             <button
               type="submit"
-              className={`w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={isSubmitting}
+              className="flex-1 py-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-2xl rounded-xl shadow-lg hover:shadow-purple-500/50 transform hover:scale-105 transition disabled:opacity-60"
             >
-              {isSubmitting ? (
-                <span className="flex items-center justify-center">
-                  <svg
-                    className="animate-spin h-5 w-5 mr-2 text-white"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Enregistrement en cours...
-                </span>
-              ) : (
-                'Enregistrer les modifications'
-              )}
+              {isSubmitting ? 'Enregistrement...' : 'Enregistrer les modifications'}
             </button>
+
             <button
               type="button"
               onClick={() => router.push('/dashboard/mes-demandes')}
-              className="w-full bg-gray-500 text-white p-2 rounded hover:bg-gray-600 mt-2"
+              className="px-8 py-6 bg-white/20 text-white font-bold text-xl rounded-xl hover:bg-white/30 transition"
             >
               Retour
             </button>
-          </form>
-        </section>
+          </div>
+        </form>
       </div>
     </div>
   );

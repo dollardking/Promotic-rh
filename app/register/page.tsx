@@ -1,206 +1,161 @@
 'use client';
-
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    nom: '',
-    prenom: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    nom: '', prenom: '', prenom: '', email: '', password: '', confirmPassword: ''
   });
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [errors, setErrors] = useState<Partial<typeof formData & { submit?: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-    if (!formData.nom.trim()) newErrors.nom = 'Le nom est requis.';
-    if (!formData.prenom.trim()) newErrors.prenom = 'Le prénom est requis.';
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email.trim()) newErrors.email = 'L\'email est requis.';
-    else if (!emailRegex.test(formData.email)) newErrors.email = 'L\'email n\'est pas valide.';
-    if (!formData.password) newErrors.password = 'Le mot de passe est requis.';
-    else if (formData.password.length < 6) newErrors.password = 'Le mot de passe doit avoir au moins 6 caractères.';
-    if (!formData.confirmPassword) newErrors.confirmPassword = 'La confirmation du mot de passe est requise.';
-    else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Les mots de passe ne correspondent pas.';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  useEffect(() => {
+    const newErrors: typeof errors = {};
+
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Email invalide';
+    }
+    if (formData.password && formData.password.length < 6) {
+      newErrors.password = 'Minimum 6 caractères';
+    }
+    if (formData.confirmPassword && formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Ne correspond pas';
+    }
+
+    setErrors(prev => ({ ...prev, ...newErrors }));
+  }, [formData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name as keyof typeof errors]) {
+      setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (validateForm()) {
-      setIsSubmitting(true);
-      try {
-        const response = await fetch('/api/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nom: formData.nom,
-            prenom: formData.prenom,
-            email: formData.email,
-            password: formData.password,
-            confirmPassword: formData.confirmPassword, // Ajouté ici
-          }),
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Erreur lors de l\'inscription.');
-        setTimeout(() => router.push('/login'), 1000);
-      } catch (error) {
-        setErrors({ submit: (error as Error).message });
-      } finally {
-        setIsSubmitting(false);
-      }
+    setErrors({});
+
+    const newErrors: typeof errors = {};
+    if (!formData.nom.trim()) newErrors.nom = 'Nom requis';
+    if (!formData.prenom.trim()) newErrors.prenom = 'Prénom requis';
+    if (!formData.email.trim()) newErrors.email = 'Email requis';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Email invalide';
+    if (!formData.password) newErrors.password = 'Mot de passe requis';
+    else if (formData.password.length < 6) newErrors.password = 'Minimum 6 caractères';
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Ne correspond pas';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur d'inscription");
+
+      alert('Inscription réussie ! Redirection...');
+      setTimeout(() => router.push('/login'), 1000);
+    } catch (err: any) {
+      setErrors({ submit: err.message });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 z-0">
-        <div className="absolute w-1/5 h-1/5 bg-blue-700 rounded-full animate-float" style={{ top: '10%', left: '5%' }}></div>
-        <div className="absolute w-1/4 h-1/4 bg-blue-400 rounded-lg animate-float-delayed" style={{ top: '30%', right: '5%' }}></div>
-        <div className="absolute w-1/3 h-1/3 bg-blue-500 rounded-full animate-float" style={{ bottom: '20%', left: '10%' }}></div>
-        <div className="absolute w-1/6 h-1/6 bg-blue-800 rounded-md animate-float-delayed" style={{ bottom: '10%', right: '15%' }}></div>
-        <div className="absolute w-1/7 h-1/7 bg-blue-600 rounded-xl animate-float" style={{ top: '50%', left: '25%' }}></div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md z-10 relative">
-        <h1 className="text-2xl font-bold mb-4 text-center text-blue-600">Inscription à promotic_RH</h1>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="nom" className="block text-sm text-black font-bold">
-              Nom
-            </label>
-            <input
-              type="text"
-              id="nom"
-              name="nom"
-              value={formData.nom}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder="Ton nom"
-              style={{ color: '#666' }}
-            />
-            {errors.nom && <p className="text-red-500 text-sm mt-1">{errors.nom}</p>}
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="absolute inset-0 bg-black/40" />
+      
+      <div className="relative z-10 bg-white/10 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/20 w-full max-w-lg">
+        <h1 className="text-4xl font-black text-white text-center mb-8">Inscription promotic_RH</h1>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <input
+                type="text" name="nom" value={formData.nom} onChange={handleChange}
+                placeholder="Nom"
+                className={`w-full px-5 py-4 rounded-xl bg-white/10 border-2 text-white placeholder-white/50 transition-all ${
+                  errors.nom ? 'border-red-500' : formData.nom ? 'border-green-500' : 'border-white/30'
+                } focus:outline-none focus:border-white/60`}
+              />
+              {errors.nom && <p className="text-red-400 text-xs mt-1">{errors.nom}</p>}
+            </div>
+            <div>
+              <input
+                type="text" name="prenom" value={formData.prenom} onChange={handleChange}
+                placeholder="Prénom"
+                className={`w-full px-5 py-4 rounded-xl bg-white/10 border-2 text-white placeholder-white/50 transition-all ${
+                  errors.prenom ? 'border-red-500' : formData.prenom ? 'border-green-500' : 'border-white/30'
+                } focus:outline-none focus:border-white/60`}
+              />
+              {errors.prenom && <p className="text-red-400 text-xs mt-1">{errors.prenom}</p>}
+            </div>
           </div>
+
           <div>
-            <label htmlFor="prenom" className="block text-sm text-black font-bold">
-              Prénom
-            </label>
             <input
-              type="text"
-              id="prenom"
-              name="prenom"
-              value={formData.prenom}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder="Ton prénom"
-              style={{ color: '#666' }}
+              type="email" name="email" value={formData.email} onChange={handleChange}
+              placeholder="Email"
+              className={`w-full px-5 py-4 rounded-xl bg-white/10 border-2 text-white placeholder-white/50 transition-all ${
+                errors.email ? 'border-red-500' : formData.email && !errors.email ? 'border-green-500' : 'border-white/30'
+              } focus:outline-none focus:border-white/60`}
             />
-            {errors.prenom && <p className="text-red-500 text-sm mt-1">{errors.prenom}</p>}
+            {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
           </div>
+
           <div>
-            <label htmlFor="email" className="block text-sm text-black font-bold">
-              Email
-            </label>
             <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder="tonemail@example.com"
-              style={{ color: '#666' }}
+              type="password" name="password" value={formData.password} onChange={handleChange}
+              placeholder="Mot de passe"
+              className={`w-full px-5 py-4 rounded-xl bg-white/10 border-2 text-white placeholder-white/50 transition-all ${
+                errors.password ? 'border-red-500' : formData.password.length >= 6 ? 'border-green-500' : 'border-white/30'
+              } focus:outline-none focus:border-white/60`}
             />
-            {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+            {errors.password && <p className="text-red-400 text-sm mt-1">{errors.password}</p>}
           </div>
+
           <div>
-            <label htmlFor="password" className="block text-sm text-black font-bold">
-              Mot de passe
-            </label>
             <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder="••••••••"
-              style={{ color: '#666' }}
+              type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange}
+              placeholder="Confirmer le mot de passe"
+              className={`w-full px-5 py-4 rounded-xl bg-white/10 border-2 text-white placeholder-white/50 transition-all ${
+                errors.confirmPassword ? 'border-red-500' : formData.confirmPassword && !errors.confirmPassword ? 'border-green-500' : 'border-white/30'
+              } focus:outline-none focus:border-white/60`}
             />
-            {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+            {errors.confirmPassword && <p className="text-red-400 text-sm mt-1">{errors.confirmPassword}</p>}
           </div>
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm text-black font-bold">
-              Confirmer le mot de passe
-            </label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder="••••••••"
-              style={{ color: '#666' }}
-            />
-            {errors.confirmPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>}
-          </div>
+
+          {errors.submit && (
+            <div className="bg-red-500/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-xl text-center">
+              {errors.submit}
+            </div>
+          )}
+
           <button
             type="submit"
-            className={`w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 transition-all duration-300 ${
-              isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            disabled={isSubmitting || Object.keys(errors).length > 0}
+            disabled={isSubmitting}
+            className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xl rounded-xl shadow-lg hover:shadow-purple-500/50 transform hover:scale-105 transition disabled:opacity-60"
           >
-            {isSubmitting ? (
-              <span className="flex items-center justify-center">
-                <svg
-                  className="animate-spin h-5 w-5 mr-2 text-white"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Inscription en cours...
-              </span>
-            ) : (
-              'S\'inscrire'
-            )}
+            {isSubmitting ? 'Création du compte...' : "S'inscrire"}
           </button>
-          {errors.submit && <p className="text-red-500 text-sm mt-1">{errors.submit}</p>}
         </form>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Déjà un compte ?{' '}
-          <Link href="/login" className="text-indigo-600 hover:underline">
-            Connectez-vous
+
+        <p className="mt-6 text-center text-white/70">
+          Déjà inscrit ?{' '}
+          <Link href="/login" className="text-purple-300 hover:text-white font-bold">
+            Se connecter
           </Link>
         </p>
       </div>

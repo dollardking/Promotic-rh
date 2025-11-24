@@ -1,13 +1,18 @@
-// app/dashboard/presences/page.tsx
 'use client';
-
 import { useAuth } from '../../../lib/useAuth';
 import { useState } from 'react';
 import Link from 'next/link';
 
+interface FormData {
+  date: string;
+  statut: 'Present' | 'Absent' | 'Conge' | 'Maladie' | 'Retard' | 'AbsentSansJustification';
+  heureArrivee: string;
+  heureDepart: string;
+}
+
 export default function PresencesPage() {
   const { token, loading } = useAuth();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     date: '',
     statut: 'Present',
     heureArrivee: '',
@@ -19,150 +24,142 @@ export default function PresencesPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'statut' && value !== 'Present') {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
-        [name]: value,
+        [name]: value as FormData['statut'], // Typé proprement
         heureArrivee: '',
         heureDepart: '',
       }));
     } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!formData.date || !formData.statut) {
-      setMessage('Date et statut sont requis.');
-      setTimeout(() => setMessage(''), 3000);
-      return;
-    }
-
+    if (!formData.date || !formData.statut) return setMessage('Date et statut requis !');
     if (formData.statut === 'Present' && !formData.heureArrivee) {
-      setMessage('L&apos;heure d&apos;arrivée est requise pour &apos;Présent&apos;.');
-      setTimeout(() => setMessage(''), 3000);
-      return;
+      return setMessage('Heure d’arrivée requise pour Présent');
     }
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/presences', {
+      const res = await fetch('/api/presences', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          authorization: `Bearer ${token}`,
+          authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          date: formData.date,
-          statut: formData.statut,
-          heureArrivee: formData.heureArrivee,
-          heureDepart: formData.heureDepart,
-        }),
+        body: JSON.stringify(formData)
       });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Erreur d'enregistrement");
-
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
       setFormData({ date: '', statut: 'Present', heureArrivee: '', heureDepart: '' });
       setMessage('Présence enregistrée avec succès !');
-      setTimeout(() => setMessage(''), 3000);
-    } catch (error) {
-      setMessage((error as Error).message);
-      setTimeout(() => setMessage(''), 5000);
+      setTimeout(() => setMessage(''), 4000);
+    } catch (err) {
+      // `err` est maintenant typé comme unknown → on le cast proprement
+      setMessage(err instanceof Error ? err.message : 'Erreur');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (loading) return <p className="text-center mt-10 text-black">Chargement...</p>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="text-white text-3xl font-bold">Chargement...</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
-        <h1 className="text-4xl font-bold text-center text-blue-800">Enregistrer ma présence</h1>
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 relative overflow-hidden">
+      <div className="absolute inset-0 bg-black/50" />
+
+      <div className="relative z-10 p-6 max-w-2xl mx-auto">
+        <h1 className="text-6xl font-black text-white text-center mb-12 drop-shadow-2xl">
+          Pointer ma Présence
+        </h1>
 
         {message && (
-          <div className={`p-4 rounded-lg text-center font-medium border ${
-            message.includes('succès') ? 'text-green-700 bg-green-100 border-green-300' : 'text-red-700 bg-red-100 border-red-300'
+          <div className={`mb-8 p-6 rounded-2xl text-center font-bold text-2xl transition-all animate-pulse ${
+            message.includes('succès')
+              ? 'bg-green-500/20 border-2 border-green-400 text-green-300'
+              : 'bg-red-500/20 border-2 border-red-400 text-red-300'
           }`}>
             {message}
           </div>
         )}
 
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-2xl font-semibold mb-6 text-black">Informer de ma présence</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-black mb-1">Date</label>
-              <input
-                type="date"
-                name="date"
-                value={formData.date}
-                onChange={handleChange}
-                className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur-xl rounded-3xl p-10 border border-white/20 shadow-2xl space-y-8">
+          <div>
+            <label className="text-white/80 text-xl font-medium">Date du jour</label>
+            <input
+              type="date"
+              name="date"
+              value={formData.date}
+              onChange={handleChange}
+              required
+              className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition"
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-bold text-black mb-1">Statut</label>
-              <select
-                name="statut"
-                value={formData.statut}
-                onChange={handleChange}
-                className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="Present">Présent</option>
-                <option value="Absent">Absent</option>
-                <option value="Conge">Congé</option>
-                <option value="Maladie">Maladie</option>
-                <option value="Retard">Retard</option>
-                <option value="AbsentSansJustification">Absent sans justification</option>
-              </select>
-            </div>
-
-            {formData.statut === 'Present' && (
-              <>
-                <div>
-                  <label className="block text-sm font-bold text-black mb-1">Heure d&apos;arrivée</label>
-                  <input
-                    type="time"
-                    name="heureArrivee"
-                    value={formData.heureArrivee}
-                    onChange={handleChange}
-                    className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-black mb-1">Heure de départ</label>
-                  <input
-                    type="time"
-                    name="heureDepart"
-                    value={formData.heureDepart}
-                    onChange={handleChange}
-                    className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-60 transition"
+          <div>
+            <label className="text-white/80 text-xl font-medium">Statut</label>
+            <select
+              name="statut"
+              value={formData.statut}
+              onChange={handleChange}
+              className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white focus:border-purple-400 focus:outline-none transition"
             >
-              {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
-            </button>
-          </form>
+              <option value="Present" className="bg-gray-800">Présent</option>
+              <option value="Absent" className="bg-gray-800">Absent</option>
+              <option value="Conge" className="bg-gray-800">En congé</option>
+              <option value="Maladie" className="bg-gray-800">Maladie</option>
+              <option value="Retard" className="bg-gray-800">En retard</option>
+              <option value="AbsentSansJustification" className="bg-gray-800">Absent sans justification</option>
+            </select>
+          </div>
 
-          <div className="mt-6 text-center">
-            <Link href="/dashboard/historique-presences" className="text-blue-600 font-medium hover:underline">
-              Voir mon historique
+          {formData.statut === 'Present' && (
+            <>
+              <div>
+                <label className="text-white/80 text-xl font-medium">Heure d’arrivée</label>
+                <input
+                  type="time"
+                  name="heureArrivee"
+                  value={formData.heureArrivee}
+                  onChange={handleChange}
+                  required
+                  className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition"
+                />
+              </div>
+              <div>
+                <label className="text-white/80 text-xl font-medium">Heure de départ (facultatif)</label>
+                <input
+                  type="time"
+                  name="heureDepart"
+                  value={formData.heureDepart}
+                  onChange={handleChange}
+                  className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition"
+                />
+              </div>
+            </>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full py-7 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black text-3xl rounded-xl shadow-2xl hover:shadow-purple-500/50 transform hover:scale-105 transition disabled:opacity-60"
+          >
+            {isSubmitting ? 'Enregistrement...' : 'Pointer ma présence'}
+          </button>
+
+          <div className="text-center pt-6">
+            <Link href="/dashboard/historique-presences" className="text-white/80 text-xl underline hover:text-white transition">
+              Voir mon historique de présences
             </Link>
           </div>
-        </section>
+        </form>
       </div>
     </div>
   );

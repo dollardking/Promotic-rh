@@ -1,8 +1,7 @@
-// app/dashboard/profil/page.tsx
 'use client';
-
 import { useAuth } from '../../../lib/useAuth';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Camera, Upload, CheckCircle } from 'lucide-react';
 
 interface EmployeData {
   id: number;
@@ -15,98 +14,101 @@ interface EmployeData {
   dateDepart: string | null;
   competences: string | null;
   actif: boolean;
+  photoUrl?: string;
   departement: { nomDepartement: string } | null;
-  utilisateurId: number;
-}
-
-interface Summary {
-  presencesCount: number;
-  salairesCount: number;
-  congesCount: number;
-  permissionsCount: number;
 }
 
 export default function ProfilPage() {
   const { user, token, loading: authLoading } = useAuth();
   const [employe, setEmploye] = useState<EmployeData | null>(null);
-  const [summary, setSummary] = useState<Summary>({
-    presencesCount: 0,
-    salairesCount: 0,
-    congesCount: 0,
-    permissionsCount: 0,
-  });
   const [form, setForm] = useState({
-    telephone: '',
-    dateEmbauche: '',
-    dateDepart: '',
-    competences: '',
+    telephone: '', dateEmbauche: '', dateDepart: '', competences: '',
   });
-  const [loading, setLoading] = useState(true);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (authLoading || !token || !user) return;
 
     const fetchProfil = async () => {
-      setLoading(true);
       try {
-        // 1. Profil employé
-        const empRes = await fetch('/api/employes/profil', {
+        const res = await fetch('/api/employes/profil', {
           headers: { authorization: `Bearer ${token}` },
         });
-        const empData = await empRes.json();
-
-        if (empRes.ok && empData.employe) {
-          setEmploye(empData.employe);
+        const data = await res.json();
+        if (res.ok && data.employe) {
+          setEmploye(data.employe);
+          setPreviewUrl(data.employe.photoUrl || '');
           setForm({
-            telephone: empData.employe.telephone || '',
-            dateEmbauche: empData.employe.dateEmbauche?.split('T')[0] || '',
-            dateDepart: empData.employe.dateDepart?.split('T')[0] || '',
-            competences: empData.employe.competences || '',
+            telephone: data.employe.telephone || '',
+            dateEmbauche: data.employe.dateEmbauche?.split('T')[0] || '',
+            dateDepart: data.employe.dateDepart?.split('T')[0] || '',
+            competences: data.employe.competences || '',
           });
-        } else {
-          setMessage('Profil non trouvé.');
-          setLoading(false);
-          return;
         }
-
-        // 2. Résumé : CORRIGÉ
-        const [presRes, salRes, congeRes, permRes] = await Promise.all([
-          fetch('/api/presences', { headers: { authorization: `Bearer ${token}` } }),
-          fetch('/api/salaires', { headers: { authorization: `Bearer ${token}` } }),
-          fetch('/api/conges', { headers: { authorization: `Bearer ${token}` } }),
-          fetch('/api/permissions', { headers: { authorization: `Bearer ${token}` } }),
-        ]);
-
-        const presData = await presRes.json();
-        const salData = await salRes.json();
-        const congeData = await congeRes.json();
-        const permData = await permRes.json();
-
-        setSummary({
-          presencesCount: Array.isArray(presData.presences) ? presData.presences.length : 0,
-          salairesCount: Array.isArray(salData.salaires) ? salData.salaires.length : 0,
-          congesCount: Array.isArray(congeData.conges) ? congeData.conges.length : 0,
-          permissionsCount: Array.isArray(permData.permissions) ? permData.permissions.length : 0,
-        });
-      } catch (error) {
-        console.error('Erreur fetch:', error);
-        setMessage('Erreur de chargement du profil.');
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        setMessage({ text: 'Erreur de chargement', type: 'error' });
       }
     };
-
     fetchProfil();
   }, [token, authLoading, user]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Vérification taille (max 3Mo) et type
+    if (!file.type.startsWith('image/')) {
+      setMessage({ text: 'Seules les images sont autorisées', type: 'error' });
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      setMessage({ text: 'Image trop lourde (max 3 Mo)', type: 'error' });
+      return;
+    }
+
+    // Preview instantanée
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    setUploading(true);
+    try {
+      const res = await fetch('/api/employes/upload-avatar', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmploye(prev => prev ? { ...prev, photoUrl: data.photoUrl } : null);
+        setMessage({ text: 'Photo mise à jour !', type: 'success' });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      setMessage({ text: err.message || 'Échec upload', type: 'error' });
+      setPreviewUrl(employe?.photoUrl || '');
+    } finally {
+      setUploading(false);
+      setTimeout(() => setMessage(null), 4000);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!employe) return;
 
     setSaving(true);
-    setMessage('');
     try {
       const res = await fetch('/api/employes/profil', {
         method: 'PUT',
@@ -114,163 +116,148 @@ export default function ProfilPage() {
           'Content-Type': 'application/json',
           authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          telephone: form.telephone,
-          dateEmbauche: form.dateEmbauche || null,
-          dateDepart: form.dateDepart || null,
-          competences: form.competences,
-        }),
+        body: JSON.stringify(form),
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erreur mise à jour');
-
-      setMessage('Profil mis à jour avec succès !');
-      setTimeout(() => setMessage(''), 4000);
+      if (res.ok) {
+        setMessage({ text: 'Profil mis à jour !', type: 'success' });
+      }
     } catch {
-      setMessage('Échec de la mise à jour.');
+      setMessage({ text: 'Échec de la sauvegarde', type: 'error' });
     } finally {
       setSaving(false);
+      setTimeout(() => setMessage(null), 4000);
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading || !employe) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <svg className="animate-spin h-10 w-10 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p className="text-black mt-4">Chargement du profil...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+        <div className="text-white text-2xl">Chargement du profil...</div>
       </div>
     );
   }
 
-  if (!employe) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-        <p className="text-red-600">Aucun profil employé trouvé.</p>
-      </div>
-    );
-  }
+  const avatarUrl = previewUrl || employe.photoUrl || '/default-avatar.png';
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 relative overflow-hidden">
+      <div className="absolute inset-0 bg-black/50" />
+      <div className="relative z-10 p-6 max-w-5xl mx-auto">
 
-        <h1 className="text-4xl font-bold text-center text-blue-800">Mon Profil</h1>
-
+        {/* Message */}
         {message && (
-          <div
-            className={`p-4 rounded-lg text-center font-medium border transition-all ${
-              message.includes('succès') ? 'text-green-700 bg-green-100 border-green-300' : 'text-red-700 bg-red-100 border-red-300'
-            }`}
-          >
-            {message}
+          <div className={`mb-6 p-4 rounded-2xl text-center font-bold border-2 transition-all ${
+            message.type === 'success' 
+              ? 'bg-green-500/20 border-green-400 text-green-300' 
+              : 'bg-red-500/20 border-red-400 text-red-300'
+          }`}>
+            {message.text}
           </div>
         )}
 
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-2xl font-semibold text-black mb-4">Informations Personnelles</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-black">
-            <p><strong>Matricule :</strong> {employe.matricule}</p>
-            <p><strong>Prénom :</strong> {employe.prenom}</p>
-            <p><strong>Nom :</strong> {employe.nom}</p>
-            <p><strong>Email :</strong> {employe.email}</p>
-            <p><strong>Département :</strong> {employe.departement?.nomDepartement || 'Aucun'}</p>
-            <p><strong>Statut :</strong> <span className={employe.actif ? 'text-green-600' : 'text-red-600'}>{employe.actif ? 'Actif' : 'Inactif'}</span></p>
-          </div>
-        </section>
+        <div className="grid md:grid-cols-3 gap-8">
 
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-2xl font-semibold text-black mb-4">Compléter mon profil</h2>
-          <form onSubmit={handleSave} className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-black mb-1">Téléphone</label>
+          {/* COLONNE AVATAR */}
+          <div className="md:col-span-1">
+            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 text-center">
+              <div className="relative inline-block">
+                <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-white/30 shadow-2xl mx-auto mb-6">
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  {uploading && (
+                    <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                      <svg className="animate-spin h-12 w-12 text-white" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="absolute bottom-4 right-4 bg-gradient-to-r from-purple-600 to-pink-600 p-4 rounded-full shadow-lg hover:scale-110 transition"
+                >
+                  <Camera className="w-6 h-6 text-white" />
+                </button>
+              </div>
+
+              <h2 className="text-3xl font-black text-white mb-2">
+                {employe.prenom} {employe.nom}
+              </h2>
+              <p className="text-white/70 text-lg">{employe.matricule}</p>
+              <p className="text-purple-300 text-sm mt-2">
+                {employe.departement?.nomDepartement || 'Aucun département'}
+              </p>
+
               <input
-                type="tel"
-                value={form.telephone}
-                onChange={(e) => setForm({ ...form, telephone: e.target.value })}
-                className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
-                placeholder="ex: +225 01 02 03 04"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-black mb-1">Date d&apos;embauche</label>
-                <input
-                  type="date"
-                  value={form.dateEmbauche}
-                  onChange={(e) => setForm({ ...form, dateEmbauche: e.target.value })}
-                  className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-black mb-1">Date de départ (facultatif)</label>
-                <input
-                  type="date"
-                  value={form.dateDepart}
-                  onChange={(e) => setForm({ ...form, dateDepart: e.target.value })}
-                  className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-black mb-1">Compétences</label>
-              <textarea
-                value={form.competences}
-                onChange={(e) => setForm({ ...form, competences: e.target.value })}
-                className="w-full p-3 border rounded-lg text-black focus:ring-2 focus:ring-blue-500"
-                rows={3}
-                placeholder="ex: JavaScript, React, Gestion de projet..."
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2 transition"
-            >
-              {saving ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Enregistrement...
-                </>
-              ) : (
-                'Mettre à jour le profil'
-              )}
-            </button>
-          </form>
-        </section>
-
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-2xl font-semibold text-black mb-4">Résumé de mes activités</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-black">
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <p className="text-3xl font-bold text-blue-700">{summary.presencesCount}</p>
-              <p className="text-sm text-gray-600">Présences enregistrées</p>
-            </div>
-            <div className="p-4 bg-green-50 rounded-lg">
-              <p className="text-3xl font-bold text-green-700">{summary.salairesCount}</p>
-              <p className="text-sm text-gray-600">Salaires versés</p>
-            </div>
-            <div className="p-4 bg-purple-50 rounded-lg">
-              <p className="text-3xl font-bold text-purple-700">{summary.congesCount}</p>
-              <p className="text-sm text-gray-600">Congés pris</p>
-            </div>
-            <div className="p-4 bg-orange-50 rounded-lg">
-              <p className="text-3xl font-bold text-orange-700">{summary.permissionsCount}</p>
-              <p className="text-sm text-gray-600">Permissions demandées</p>
             </div>
           </div>
-        </section>
+
+          {/* COLONNE INFO + FORM */}
+          <div className="md:col-span-2 space-y-8">
+            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20">
+              <h3 className="text-2xl font-bold text-white mb-6">Informations personnelles</h3>
+              <div className="grid grid-cols-2 gap-6 text-white/80">
+                <div><strong>Email :</strong> {employe.email}</div>
+                <div><strong>Téléphone :</strong> {employe.telephone || 'Non renseigné'}</div>
+                <div><strong>Date embauche :</strong> {form.dateEmbauche || 'Non renseignée'}</div>
+                <div><strong>Statut :</strong> <span className={employe.actif ? 'text-green-400' : 'text-red-400'}>
+                  {employe.actif ? 'Actif' : 'Inactif'}
+                </span></div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSave} className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20">
+              <h3 className="text-2xl font-bold text-white mb-6">Mettre à jour mon profil</h3>
+              <div className="space-y-6">
+                <input
+                  type="tel"
+                  placeholder="Téléphone"
+                  value={form.telephone}
+                  onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                  className="w-full px-6 py-4 rounded-xl bg-white/10 border border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition"
+                />
+                <div className="grid grid-cols-2 gap-6">
+                  <input
+                    type="date"
+                    value={form.dateEmbauche}
+                    onChange={(e) => setForm({ ...form, dateEmbauche: e.target.value })}
+                    className="px-6 py-4 rounded-xl bg-white/10 border border-white/30 text-white focus:border-purple-400 focus:outline-none transition"
+                  />
+                  <input
+                    type="date"
+                    placeholder="Date de départ"
+                    value={form.dateDepart}
+                    onChange={(e) => setForm({ ...form, dateDepart: e.target.value })}
+                    className="px-6 py-4 rounded-xl bg-white/10 border border-white/30 text-white focus:border-purple-400 focus:outline-none transition"
+                  />
+                </div>
+                <textarea
+                  rows={4}
+                  placeholder="Compétences (React, Node.js, Gestion de projet...)"
+                  value={form.competences}
+                  onChange={(e) => setForm({ ...form, competences: e.target.value })}
+                  className="w-full px-6 py-4 rounded-xl bg-white/10 border border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition resize-none"
+                />
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xl rounded-xl shadow-lg hover:shadow-purple-500/50 transform hover:scale-105 transition disabled:opacity-60"
+                >
+                  {saving ? 'Enregistrement...' : 'Mettre à jour le profil'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   );
