@@ -57,50 +57,49 @@ export default function SalairesPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsSubmitting(true);
-  try {
-    const endpoint = selectedSalaire ? `/api/salaire/${selectedSalaire.id}` : '/api/salaire';
-    const method = selectedSalaire ? 'PUT' : 'POST';
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const endpoint = selectedSalaire ? `/api/salaire/${selectedSalaire.id}` : '/api/salaire';
+      const method = selectedSalaire ? 'PUT' : 'POST';
 
-    const response = await fetch(endpoint, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        employeId: Number(formData.employeId),
-        salaireBase: Number(formData.salaireBase),
-        primes: Number(formData.primes),
-        deductions: Number(formData.deductions),
-        mois: formData.mois,
-        datePaiement: formData.datePaiement || null,
-        statut: formData.statut,
-      }),
-    });
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          employeId: Number(formData.employeId),
+          salaireBase: Number(formData.salaireBase),
+          primes: Number(formData.primes),
+          deductions: Number(formData.deductions),
+          mois: formData.mois,
+          datePaiement: formData.datePaiement || null,
+          statut: formData.statut,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
 
-    if (!response.ok) throw new Error(data.error || 'Erreur');
+      if (selectedSalaire) {
+        setSalaires((prev) => prev.map((s) => (s.id === selectedSalaire.id ? data.salaire : s)));
+        setFilteredSalaires((prev) => prev.map((s) => (s.id === selectedSalaire.id ? data.salaire : s)));
+      } else {
+        setSalaires((prev) => [data.salaire, ...prev]);
+        setFilteredSalaires((prev) => [data.salaire, ...prev]);
+      }
 
-    if (selectedSalaire) {
-      setSalaires((prev) => prev.map((s) => (s.id === selectedSalaire.id ? data.salaire : s)));
-      setFilteredSalaires((prev) => prev.map((s) => (s.id === selectedSalaire.id ? data.salaire : s)));
-    } else {
-      setSalaires((prev) => [data.salaire, ...prev]);
-      setFilteredSalaires((prev) => [data.salaire, ...prev]);
+      setMessage(data.message || 'Opération réussie !');
+      resetForm();
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error: any) {
+      setMessage(error.message || 'Erreur');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setMessage(data.message || 'Opération réussie !');
-    resetForm();
-    setTimeout(() => setMessage(''), 3000);
-  } catch (error: any) {
-    setMessage(error.message || 'Erreur');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const resetForm = () => {
     setFormData({
@@ -129,50 +128,46 @@ export default function SalairesPage() {
   };
 
   const handleValidatePayment = async (id: number) => {
-  setIsSubmitting(true);
-  try {
-    const res = await fetch(`/api/salaire/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ statut: 'Payé' }),
-    });
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/salaire/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ statut: 'Payé' }),
+      });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Erreur');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
 
-    setSalaires(prev => prev.map(s => s.id === id ? data.salaire : s));
-    setFilteredSalaires(prev => prev.map(s => s.id === id ? data.salaire : s));
-    setMessage(data.message);
-    setTimeout(() => setMessage(''), 4000);
-  } catch (error: any) {
-    setMessage(error.message);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+      setSalaires(prev => prev.map(s => s.id === id ? data.salaire : s));
+      setFilteredSalaires(prev => prev.map(s => s.id === id ? data.salaire : s));
+      setMessage(data.message || 'Paiement validé !');
+      setTimeout(() => setMessage(''), 4000);
+    } catch (error: any) {
+      setMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleGenerateMonthly = async () => {
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/salaire/monthly', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
         body: JSON.stringify({ mois: moisCourant }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur génération');
-
       setMessage('Salaires du mois calculés avec succès !');
       setTimeout(() => setMessage(''), 3000);
       fetchSalaires();
-    } catch (error) {
-      setMessage((error as Error).message);
+    } catch (error: any) {
+      setMessage(error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -187,16 +182,13 @@ export default function SalairesPage() {
     try {
       const res = await fetch('/api/salaire/calculate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
         body: JSON.stringify({ employeId: formData.employeId, mois: formData.mois }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur calcul');
 
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         salaireBase: data.salaireBase,
         primes: data.primes,
@@ -205,97 +197,82 @@ export default function SalairesPage() {
 
       setMessage('Salaire calculé pour l\'employé !');
       setTimeout(() => setMessage(''), 3000);
-    } catch (error) {
-      setMessage((error as Error).message);
+    } catch (error: any) {
+      setMessage(error.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Dans useEffect
-const fetchSalaires = async () => {
-  try {
-    const response = await fetch('/api/salaire', {
-      method: 'GET',
-      headers: {
-        'authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    let errorMessage = 'Erreur inconnue';
-
-    if (!response.ok) {
-      try {
-        const err = await response.json();
-        errorMessage = err.error || `Erreur HTTP ${response.status}`;
-      } catch {
-        errorMessage = `Erreur HTTP ${response.status}`;
-      }
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    setSalaires(data.salaires || []);
-    setFilteredSalaires(data.salaires || []);
-  } catch (error: any) {
-    console.error('Erreur chargement salaires:', error);
-    setMessage(error.message || 'Impossible de charger les salaires.');
-  }
-};
-
-  const fetchEmployes = async () => {
+  const fetchSalaires = async () => {
     try {
-      const response = await fetch('/api/employes', {
-        headers: { 'authorization': `Bearer ${token}` },
+      const response = await fetch('/api/salaire', {
+        headers: { authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
+      if (!response.ok) throw new Error('Erreur chargement');
       const data = await response.json();
-      if (response.ok) {
-        setEmployes(data.employes as Employe[]);
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des employés:', error);
+      setSalaires(data.salaires || []);
+      setFilteredSalaires(data.salaires || []);
+    } catch (error: any) {
+      setMessage(error.message || 'Impossible de charger les salaires.');
     }
   };
 
+  const fetchEmployes = async () => {
+    try {
+      const response = await fetch('/api/employes', { headers: { authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (response.ok) setEmployes(data.employes as Employe[]);
+    } catch (error) { console.error(error); }
+  };
+
   useEffect(() => {
-    if (loading || !token) return;
-    fetchSalaires();
-    fetchEmployes();
+    if (!loading && token) {
+      fetchSalaires();
+      fetchEmployes();
+    }
   }, [token, loading]);
 
   useEffect(() => {
-    let updatedSalaires = [...salaires];
-    if (filters.mois) {
-      updatedSalaires = updatedSalaires.filter((s) => new Date(s.mois).toISOString().slice(0, 7) === filters.mois);
-    }
-    if (filters.statut) {
-      updatedSalaires = updatedSalaires.filter((s) => s.statut === filters.statut);
-    }
-    setFilteredSalaires(updatedSalaires);
+    let updated = [...salaires];
+    if (filters.mois) updated = updated.filter(s => new Date(s.mois).toISOString().slice(0, 7) === filters.mois);
+    if (filters.statut) updated = updated.filter(s => s.statut === filters.statut);
+    setFilteredSalaires(updated);
   }, [filters, salaires]);
 
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
+  const formatFCFA = (montant: number) => montant.toLocaleString('fr-FR') + ' FCFA';
+
+  if (loading) return <p className="text-center mt-20 text-white text-4xl font-black">Chargement...</p>;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="w-full max-w-2xl space-y-8">
-        <h1 className="text-3xl font-bold text-center text-blue-600 mb-6">Gestion des salaires</h1>
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 relative overflow-hidden">
+      <div className="absolute inset-0 bg-black/50" />
+      
+      <div className="relative z-10 p-8 max-w-7xl mx-auto">
+        <h1 className="text-6xl font-black text-white text-center mb-10 drop-shadow-2xl">
+          Gestion des <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Salaires</span>
+        </h1>
+
         {message && (
-          <div className="text-green-600 text-center p-2 bg-green-100 rounded-lg">
-            {message}
+          <div className="text-center mb-8">
+            <div className="inline-block bg-white/20 backdrop-blur-xl rounded-2xl px-8 py-4 border border-white/30">
+              <p className="text-2xl font-bold text-green-300">{message}</p>
+            </div>
           </div>
         )}
-        <section className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-black">Enregistrer ou modifier un salaire</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/* FORMULAIRE */}
+        <section className="bg-white/10 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/20 mb-10">
+          <h2 className="text-3xl font-bold text-white mb-6">Enregistrer ou modifier un salaire</h2>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* TOUS LES DROPDOWNS AVEC FOND BLANC & TEXTE NOIR = 100% LISIBLES */}
             <div>
-              <label className="block text-sm font-bold text-black">Employé</label>
+              <label className="block text-xl font-bold text-white mb-2">Employé</label>
               <select
                 name="employeId"
                 value={formData.employeId}
                 onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
+                className="w-full p-4 rounded-xl bg-white text-black font-medium border border-gray-300 focus:ring-4 focus:ring-purple-500"
                 required
               >
                 <option value={0}>Sélectionner un employé</option>
@@ -306,162 +283,122 @@ const fetchSalaires = async () => {
                 ))}
               </select>
             </div>
+
             <div>
-              <label className="block text-sm font-bold text-black">Salaire de base</label>
-              <input
-                type="number"
-                name="salaireBase"
-                value={formData.salaireBase}
-                onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
-                step="0.01"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-black">Primes</label>
-              <input
-                type="number"
-                name="primes"
-                value={formData.primes}
-                onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
-                step="0.01"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-black">Déductions</label>
-              <input
-                type="number"
-                name="deductions"
-                value={formData.deductions}
-                onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
-                step="0.01"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-black">Mois</label>
-              <input
-                type="month"
-                name="mois"
-                value={formData.mois}
-                onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-black">Date de paiement</label>
-              <input
-                type="date"
-                name="datePaiement"
-                value={formData.datePaiement}
-                onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-black">Statut</label>
+              <label className="block text-xl font-bold text-white mb-2">Statut</label>
               <select
                 name="statut"
                 value={formData.statut}
                 onChange={handleChange}
-                className="w-full p-2 border rounded text-black"
+                className="w-full p-4 rounded-xl bg-white text-black font-medium border border-gray-300 focus:ring-4 focus:ring-purple-500"
                 required
               >
                 <option value="En attente de validation">En attente de validation</option>
                 <option value="En attente d'acceptation employe">En attente d'acceptation employé</option>
-                <option value="Paye">Payé</option>
+                <option value="Payé">Payé</option>
                 <option value="Rejeté">Rejeté</option>
               </select>
             </div>
-            <button
-              type="submit"
-              className={`w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Enregistrement...' : selectedSalaire ? 'Modifier' : 'Enregistrer'}
-            </button>
-            <button
-              type="button"
-              onClick={handleGenerateMonthly}
-              className={`w-full bg-purple-600 text-white p-2 rounded hover:bg-purple-700 transition-colors mt-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Calcul...' : 'Calculer salaires du mois pour tous'}
-            </button>
-            <button
-              type="button"
-              onClick={handleGenerateForEmploye}
-              className={`w-full bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700 transition-colors mt-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={isSubmitting || !formData.employeId || !formData.mois}
-            >
-              {isSubmitting ? 'Calcul...' : 'Calculer pour cet employé'}
-            </button>
-          </form>
-        </section>
-        <section className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-black">Liste des salaires</h2>
-          <div className="mb-4 space-y-2">
+
+            {/* Les autres champs restent en violet mais lisibles */}
             <div>
-              <label className="block text-sm font-bold text-black">Filtrer par mois</label>
-              <input
-                type="month"
-                name="mois"
-                value={filters.mois}
-                onChange={handleFilterChange}
-                className="w-full p-2 border rounded text-black"
-              />
+              <label className="block text-xl font-bold text-white mb-2">Salaire de base</label>
+              <input type="number" name="salaireBase" value={formData.salaireBase} onChange={handleChange} className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 placeholder-white/60" required />
             </div>
             <div>
-              <label className="block text-sm font-bold text-black">Filtrer par statut</label>
-              <select
-                name="statut"
-                value={filters.statut}
-                onChange={handleFilterChange}
-                className="w-full p-2 border rounded text-black"
-              >
+              <label className="block text-xl font-bold text-white mb-2">Primes</label>
+              <input type="number" name="primes" value={formData.primes} onChange={handleChange} className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 placeholder-white/60" />
+            </div>
+            <div>
+              <label className="block text-xl font-bold text-white mb-2">Déductions</label>
+              <input type="number" name="deductions" value={formData.deductions} onChange={handleChange} className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 placeholder-white/60" />
+            </div>
+            <div>
+              <label className="block text-xl font-bold text-white mb-2">Mois</label>
+              <input type="month" name="mois" value={formData.mois} onChange={handleChange} className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30" required />
+            </div>
+            <div>
+              <label className="block text-xl font-bold text-white mb-2">Date de paiement</label>
+              <input type="date" name="datePaiement" value={formData.datePaiement} onChange={handleChange} className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6">
+              <button type="submit" disabled={isSubmitting} className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black text-xl py-5 rounded-2xl hover:scale-105 transition">
+                {isSubmitting ? 'Enregistrement...' : selectedSalaire ? 'Modifier' : 'Enregistrer'}
+              </button>
+              <button type="button" onClick={handleGenerateMonthly} disabled={isSubmitting} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black text-xl py-5 rounded-2xl hover:scale-105 transition">
+                Calculer tous les salaires
+              </button>
+              <button type="button" onClick={handleGenerateForEmploye} disabled={isSubmitting || !formData.employeId} className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-black text-xl py-5 rounded-2xl hover:scale-105 transition">
+                Calculer pour cet employé
+              </button>
+            </div>
+          </form>
+        </section>
+
+        {/* FILTRES & LISTE */}
+        <section className="bg-white/10 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/20">
+          <h2 className="text-3xl font-bold text-white mb-6">Liste des salaires</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div>
+              <label className="block text-xl font-bold text-white mb-2">Filtrer par mois</label>
+              <input type="month" name="mois" value={filters.mois} onChange={handleFilterChange} className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30" />
+            </div>
+            <div>
+              <label className="block text-xl font-bold text-white mb-2">Filtrer par statut</label>
+              <select name="statut" value={filters.statut} onChange={handleFilterChange} className="w-full p-4 rounded-xl bg-white text-black font-medium border border-gray-300 focus:ring-4 focus:ring-purple-500">
                 <option value="">Tous</option>
                 <option value="En attente de validation">En attente de validation</option>
                 <option value="En attente d'acceptation employe">En attente d'acceptation employé</option>
-                <option value="Paye">Payé</option>
+                <option value="Payé">Payé</option>
                 <option value="Rejeté">Rejeté</option>
               </select>
             </div>
           </div>
-          <ul className="space-y-2">
+
+          <div className="space-y-6">
             {filteredSalaires.map((salaire) => (
-              <li key={salaire.id} className="p-2 bg-gray-100 rounded text-black flex justify-between items-center">
-                {employes.find((e) => e.id === salaire.employeId)?.prenom || 'Inconnu'} {employes.find((e) => e.id === salaire.employeId)?.nom || ''} - 
-                Mois: {new Date(salaire.mois).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })} - 
-                Salaire de base: {salaire.salaireBase.toFixed(2)}€ - 
-                Primes: {salaire.primes.toFixed(2)}€ - 
-                Déductions: {salaire.deductions.toFixed(2)}€ - 
-                Total: {(salaire.salaireBase + salaire.primes - salaire.deductions).toFixed(2)}€ - 
-                Statut: {salaire.statut} - 
-                Paiement: {salaire.datePaiement ? new Date(salaire.datePaiement).toLocaleDateString('fr-FR') : 'N/A'}
-                <div className="ml-4 space-x-2">
-                  <button
-                    onClick={() => handleEdit(salaire)}
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    Modifier
-                  </button>
-                  {/* Dans le tableau */}
+              <div key={salaire.id} className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20">
+                <div className="flex flex-wrap justify-between items-center gap-4 text-white">
+                  <div>
+                    <p className="text-2xl font-black">
+                      {employes.find(e => e.id === salaire.employeId)?.prenom || 'Inconnu'} {employes.find(e => e.id === salaire.employeId)?.nom || ''}
+                    </p>
+                    <p className="text-lg opacity-80">
+                      Mois: {new Date(salaire.mois).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl">Base: {formatFCFA(salaire.salaireBase)}</p>
+                    <p className="text-green-400">+ Primes: {formatFCFA(salaire.primes)}</p>
+                    <p className="text-red-400">- Déductions: {formatFCFA(salaire.deductions)}</p>
+                    <p className="text-3xl font-black text-cyan-400 mt-2">
+                      Net: {formatFCFA(salaire.salaireBase + salaire.primes - salaire.deductions)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold mb-2">{salaire.statut}</p>
+                    {salaire.datePaiement && <p className="text-sm opacity-70">Payé le {new Date(salaire.datePaiement).toLocaleDateString('fr-FR')}</p>}
+                  </div>
+                  <div className="space-x-3">
+                    <button onClick={() => handleEdit(salaire)} className="bg-purple-600 px-6 py-3 rounded-xl font-bold hover:bg-purple-700 transition">
+                      Modifier
+                    </button>
                     {salaire.statut === 'En attente de validation' && (
                       <button
                         onClick={() => handleValidatePayment(salaire.id)}
-                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
                         disabled={isSubmitting}
+                        className="bg-gradient-to-r from-green-500 to-emerald-600 px-8 py-3 rounded-xl font-black hover:scale-110 transition disabled:opacity-50"
                       >
                         Valider Paiement
                       </button>
                     )}
+                  </div>
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         </section>
       </div>
     </div>

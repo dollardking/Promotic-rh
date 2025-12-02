@@ -1,5 +1,4 @@
 'use client';
-
 import { useAuth } from '../../../lib/useAuth';
 import { useEffect, useState } from 'react';
 
@@ -29,42 +28,17 @@ export default function RapportsAdmin() {
       setError('');
       try {
         const res = await fetch('/api/rapport', {
-          method: 'GET',
-          headers: {
-            'authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { authorization: `Bearer ${token}` },
         });
 
-        // Gestion détaillée des erreurs HTTP
-        if (res.status === 403) {
-          throw new Error('Accès refusé. Vous n’êtes pas autorisé à voir ces rapports.');
-        }
-        if (res.status === 401) {
-          throw new Error('Session expirée. Veuillez vous reconnecter.');
-        }
-        if (res.status === 500) {
-          throw new Error('Erreur interne du serveur. Réessayez plus tard.');
-        }
         if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`Erreur ${res.status}: ${errText || 'Inconnue'}`);
+          const err = await res.text();
+          throw new Error(err || 'Erreur de chargement');
         }
 
-        const text = await res.text();
-        if (!text.trim()) throw new Error('Réponse vide du serveur');
-
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (parseErr) {
-          console.error('JSON invalide:', text);
-          throw new Error('Données corrompues reçues du serveur');
-        }
-
+        const data = await res.json();
         setRapports(data.rapports || []);
       } catch (err: any) {
-        console.error('Erreur fetch rapports:', err);
         setError(err.message || 'Impossible de charger les rapports');
       } finally {
         setLoading(false);
@@ -72,7 +46,7 @@ export default function RapportsAdmin() {
     };
 
     fetchRapports();
-    const interval = setInterval(fetchRapports, 15000); // Toutes les 15s
+    const interval = setInterval(fetchRapports, 15000);
     return () => clearInterval(interval);
   }, [token]);
 
@@ -82,15 +56,12 @@ export default function RapportsAdmin() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${token}`,
+          authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ id }),
       });
 
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err || 'Erreur téléchargement');
-      }
+      if (!res.ok) throw new Error('Erreur téléchargement');
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -104,47 +75,91 @@ export default function RapportsAdmin() {
     }
   };
 
-  // UI
-  if (loading) return <p className="text-center mt-20 text-purple-600">Chargement des rapports...</p>;
-  if (error) return <p className="text-center mt-20 text-red-600 font-medium">{error}</p>;
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-white flex items-center justify-center">
+        <div className="text-yellow-500 text-5xl font-bold animate-pulse">CHARGEMENT...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center p-6">
+        <div className="bg-red-900/40 backdrop-blur-sm rounded-2xl p-10 border border-red-500/50">
+          <p className="text-2xl font-bold text-red-400 text-center">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-8 min-h-screen bg-purple-50">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-5xl font-bold text-purple-700 mb-10 text-center">Rapports RH Reçus</h1>
+    <>
+      {/* MÊME FOND QUE TOUTES LES PAGES ADMIN – NOIR + SOLEIL SCINTILLANT */}
+      <div className="fixed inset-0 bg-black overflow-hidden -z-10">
+        <div className="absolute top-8 left-8 w-80 h-80 bg-yellow-600/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-16 left-16 w-56 h-56 bg-yellow-400/30 rounded-full blur-2xl animate-ping" />
+        <div className="absolute top-28 left-28 w-32 h-32 bg-yellow-300/50 rounded-full blur-xl animate-pulse" />
+        <div className="absolute top-20 left-44 w-1 h-64 bg-yellow-400/10 rotate-12 animate-pulse" />
+        <div className="absolute top-20 left-20 w-1 h-64 bg-yellow-400/10 -rotate-12 animate-pulse delay-300" />
+      </div>
 
-        <div className="bg-white rounded-3xl shadow-2xl p-8">
+      <div className="relative min-h-screen px-6 py-12 max-w-7xl mx-auto text-white">
+        {/* TITRE */}
+        <h1 className="text-5xl md:text-6xl font-bold text-center mb-12 text-yellow-400 drop-shadow-2xl">
+          Rapports RH reçus
+        </h1>
+
+        {/* LISTE DES RAPPORTS */}
+        <div className="space-y-6">
           {rapports.length === 0 ? (
-            <p className="text-center text-xl text-gray-500 py-12">
-              Aucun rapport reçu pour le moment.
-            </p>
+            <div className="text-center py-20">
+              <p className="text-4xl font-bold text-white/40">Aucun rapport reçu pour le moment</p>
+              <p className="text-xl text-white/30 mt-4">Les rapports apparaîtront ici dès leur envoi</p>
+            </div>
           ) : (
-            <div className="space-y-6">
-              {rapports.map(r => (
-                <div
-                  key={r.id}
-                  className="border-2 border-purple-200 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:shadow-xl transition"
-                >
+            rapports.map((r) => (
+              <div
+                key={r.id}
+                className="bg-zinc-900/70 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-yellow-500/30 transition"
+              >
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                   <div>
-                    <p className="text-xl font-bold text-purple-800">{r.nomFichier}</p>
-                    <p className="text-sm text-gray-600">
-                      Envoyé par <strong>{r.rh.prenom} {r.rh.nom}</strong> • {new Date(r.dateGeneration).toLocaleString('fr-FR')}
+                    <h3 className="text-2xl font-bold text-yellow-400">{r.nomFichier}</h3>
+                    <p className="text-gray-300 mt-2">
+                      Envoyé par <span className="font-semibold text-purple-300">{r.rh.prenom} {r.rh.nom}</span>
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {new Date(r.dateGeneration).toLocaleDateString('fr-FR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
                     </p>
                   </div>
+
                   <button
                     onClick={() => download(r.id)}
-                    className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition transform hover:scale-105 ${
-                      r.type === 'PDF' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
-                    }`}
+                    className={`px-10 py-4 rounded-xl font-bold text-lg transition hover:scale-105 shadow-lg ${
+                      r.type === 'PDF'
+                        ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500'
+                        : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500'
+                    } text-white`}
                   >
                     Télécharger {r.type}
                   </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))
           )}
         </div>
+
+        <div className="text-center mt-20 text-gray-600 text-sm">
+          PROMOTIC TOGO 2025 • TOUT EST SOUS CONTRÔLE
+        </div>
       </div>
-    </div>
+    </>
   );
 }

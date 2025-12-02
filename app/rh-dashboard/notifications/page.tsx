@@ -39,8 +39,21 @@ export default function NotificationsPage() {
   }, [token, loading]);
 
   const handleClick = (lien: string | null) => {
-    if (lien) {
+    if (!lien) return;
+
+    // PROTECTION ABSOLUE contre notFound()
+    const validLinks = [
+      '/rh-dashboard/presences',
+      '/rh-dashboard/conges',
+      '/rh-dashboard/salaires',
+    ];
+
+    if (validLinks.includes(lien)) {
       router.push(lien);
+    } else {
+      console.warn('Lien invalide bloqué :', lien);
+      // Optionnel : tu peux rediriger vers la page principale
+      // router.push('/rh-dashboard');
     }
   };
 
@@ -54,28 +67,31 @@ export default function NotificationsPage() {
         <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <ul className="space-y-3">
             {notifications.length === 0 ? (
-              <li className="text-center text-gray-500 py-8">Aucune notification.</li>
+              <li className="text-center text-gray-500 py-8 text-xl">
+                Aucune notification
+              </li>
             ) : (
               notifications.map(notif => (
                 <li
                   key={notif.id}
-                  className={`p-4 rounded-lg border ${
+                  className={`p-6 rounded-xl border transition-all cursor-pointer hover:shadow-lg hover:scale-[1.02] ${
                     notif.lu ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-300'
                   }`}
+                  onClick={() => handleClick(notif.lien)}
                 >
-                  <p className="text-black font-medium">{notif.message}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {new Date(notif.dateCreation).toLocaleString('fr-FR')}
-                  </p>
-
-                  {notif.lien && (
-                    <button
-                      onClick={() => handleClick(notif.lien!)}
-                      className="mt-2 text-blue-600 font-medium hover:underline text-sm"
-                    >
-                      Voir détail →
-                    </button>
-                  )}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-lg font-medium text-black">{notif.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(notif.dateCreation).toLocaleString('fr-FR')}
+                      </p>
+                    </div>
+                    {notif.lien && (
+                      <span className="ml-4 text-blue-600 font-bold text-sm whitespace-nowrap">
+                        Voir →
+                      </span>
+                    )}
+                  </div>
                 </li>
               ))
             )}

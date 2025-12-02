@@ -127,11 +127,11 @@ export default function SalairesPage() {
                       {new Date(s.mois).toLocaleString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()}
                     </h3>
                     <div className="mt-6 space-y-3 text-xl">
-                      <p className="text-white/90">Salaire de base : <span className="font-bold text-2xl text-yellow-300">{s.salaireBase.toFixed(2)} €</span></p>
-                      <p className="text-green-300">+ Primes : <span className="font-bold">{s.primes.toFixed(2)} €</span></p>
-                      <p className="text-red-300">- Déductions : <span className="font-bold">{s.deductions.toFixed(2)} €</span></p>
+                      <p className="text-white/90">Salaire de base : <span className="font-bold text-2xl text-yellow-300">{s.salaireBase.toFixed(2)} fcfa</span></p>
+                      <p className="text-green-300">+ Primes : <span className="font-bold">{s.primes.toFixed(2)} fcfa</span></p>
+                      <p className="text-red-300">- Déductions : <span className="font-bold">{s.deductions.toFixed(2)} fcfa</span></p>
                       <p className="text-3xl font-black text-pink-300 mt-4">
-                        Net à payer : <span className="text-4xl">{(s.salaireBase + s.primes - s.deductions).toFixed(2)} €</span>
+                        Net à payer : <span className="text-4xl">{(s.salaireBase + s.primes - s.deductions).toFixed(2)} fcfa</span>
                       </p>
                       {s.datePaiement && (
                         <p className="text-white/70 text-lg mt-3">

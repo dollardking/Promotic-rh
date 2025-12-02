@@ -17,13 +17,13 @@ export default function Sidebar({ logout, user }: SidebarProps) {
 
   // ICÔNES EMOJI COMME DEMANDÉ
   const links = [
-    { href: '/rh-dashboard', label: 'Tableau de bord RH', icon: '🏠' },
+    { href: '/rh-dashboard', label: 'Tableau de bord', icon: '🏠' },
     { href: '/rh-dashboard/departements', label: 'Départements et Rapports', icon: '🏢' },
     { href: '/rh-dashboard/conges', label: 'Gestion des congés', icon: '📅' },
     { href: '/rh-dashboard/presences', label: 'Gestion des présences', icon: '📊' },
     { href: '/rh-dashboard/salaires', label: 'Gestion des salaires', icon: '💰' },
-    { href: '/rh-dashboard/notifications', label: 'Notifications RH', icon: '🔔' },
-    { href: '/rh-dashboard/parametres', label: 'Paramètres RH', icon: '⚙️' },
+    { href: '/rh-dashboard/notifications', label: 'Notifications', icon: '🔔' },
+    { href: '/rh-dashboard/parametres', label: 'Paramètres', icon: '⚙️' },
   ];
 
   const [isModalOpen, setIsModalOpen] = useState(false);

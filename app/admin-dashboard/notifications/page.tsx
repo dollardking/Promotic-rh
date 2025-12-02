@@ -36,7 +36,7 @@ export default function NotificationsPage() {
     }
   }, [token]);
 
-  if (loading) return <p className="text-center mt-20 text-2xl">Chargement des notifications...</p>;
+  if (loading) return <p className="text-center text-black mt-20 text-2xl">Chargement des notifications...</p>;
 
   return (
     <div className="p-8 min-h-screen bg-purple-50">

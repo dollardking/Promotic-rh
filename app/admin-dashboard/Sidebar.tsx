@@ -1,6 +1,5 @@
 // app/admin-dashboard/Sidebar.tsx
 'use client';
-
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { DecodedToken } from '../../lib/useAuth';
@@ -14,31 +13,34 @@ interface SidebarProps {
 
 export default function Sidebar({ logout, user }: SidebarProps) {
   const pathname = usePathname();
-
   const links = [
     { href: '/admin-dashboard', label: 'Tableau de bord', icon: '🏠' },
     { href: '/admin-dashboard/users', label: 'Gestion des rôles', icon: '👥' },
     { href: '/admin-dashboard/departements', label: 'Départements', icon: '🏢' },
     { href: '/admin-dashboard/rapports', label: 'Rapports', icon: '📂' },
     { href: '/admin-dashboard/notifications', label: 'Notifications', icon: '🔔' },
+    { href: '/admin-dashboard/sauvegarde', label: 'Sauvegardes', icon: '🎬' },
     { href: '/admin-dashboard/parametres', label: 'Paramètres', icon: '⚙️' },
   ];
+  
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-
   const handleLogoutClick = () => setIsModalOpen(true);
   const confirmLogout = () => { logout(); setIsModalOpen(false); };
   const cancelLogout = () => setIsModalOpen(false);
 
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-purple-700 to-purple-900 text-white p-4 flex flex-col shadow-2xl overflow-y-auto">
-      {/* HEADER */}
-      <div className="text-center mb-6 pt-4">
-        <h2 className="text-2xl font-bold mb-8 text-center animate-pulse">Promotic_RH</h2>
-      </div>
+      {/* LOGO & TITRE – INTACT */}
+      <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition mb-12">
+        <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-2xl">
+          RH
+        </div>
+        <span className="text-white text-2xl font-bold tracking-wider">promotic_RH</span>
+      </Link>
 
-      {/* NAVIGATION */}
-      <nav className="flex-1 space-y-2 px-2">
+      {/* NAVIGATION – PLUS D’ESPACE AU-DESSUS, LIENS SERRÉS */}
+      <nav className="flex-1 space-y-1 px-2">
         {links.map((link) => (
           <Link
             key={link.href}
@@ -63,7 +65,6 @@ export default function Sidebar({ logout, user }: SidebarProps) {
           </p>
           <p className="text-yellow-300 text-xs font-bold">ADMINISTRATEUR</p>
         </div>
-
         <button
           onClick={handleLogoutClick}
           className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 text-sm"
@@ -73,7 +74,7 @@ export default function Sidebar({ logout, user }: SidebarProps) {
         </button>
       </div>
 
-      {/* MODAL */}
+      {/* MODAL CONFIRMATION */}
       <Modal
         isOpen={isModalOpen}
         onRequestClose={cancelLogout}
