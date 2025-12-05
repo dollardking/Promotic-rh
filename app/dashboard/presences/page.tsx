@@ -13,7 +13,7 @@ interface FormData {
 export default function PresencesPage() {
   const { token, loading } = useAuth();
   const [formData, setFormData] = useState<FormData>({
-    date: '',
+    date: new Date().toISOString().split('T')[0],
     statut: 'Present',
     heureArrivee: '',
     heureDepart: '',
@@ -26,7 +26,7 @@ export default function PresencesPage() {
     if (name === 'statut' && value !== 'Present') {
       setFormData(prev => ({
         ...prev,
-        [name]: value as FormData['statut'], // Typé proprement
+        [name]: value as FormData['statut'],
         heureArrivee: '',
         heureDepart: '',
       }));
@@ -54,93 +54,108 @@ export default function PresencesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur');
-      setFormData({ date: '', statut: 'Present', heureArrivee: '', heureDepart: '' });
+      setFormData({ ...formData, heureArrivee: '', heureDepart: '' });
       setMessage('Présence enregistrée avec succès !');
-      setTimeout(() => setMessage(''), 4000);
-    } catch (err) {
-      // `err` est maintenant typé comme unknown → on le cast proprement
-      setMessage(err instanceof Error ? err.message : 'Erreur');
+      setTimeout(() => setMessage(''), 5000);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Erreur réseau');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      <div className="text-white text-3xl font-bold">Chargement...</div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-white flex items-center justify-center">
+        <div className="text-yellow-500 text-5xl font-bold animate-pulse">CHARGEMENT...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 relative overflow-hidden">
-      <div className="absolute inset-0 bg-black/50" />
+    <>
+      {/* FOND IDENTIQUE AUX AUTRES PAGES EMPLOYÉ */}
+      <div className="fixed inset-0 bg-black overflow-hidden -z-10">
+        <div className="absolute top-8 left-8 w-80 h-80 bg-yellow-600/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-16 left-16 w-56 h-56 bg-yellow-400/30 rounded-full blur-2xl animate-ping" />
+        <div className="absolute top-28 left-28 w-32 h-32 bg-yellow-300/50 rounded-full blur-xl animate-pulse" />
+        <div className="absolute top-20 left-44 w-1 h-64 bg-yellow-400/10 rotate-12 animate-pulse" />
+        <div className="absolute top-20 left-20 w-1 h-64 bg-yellow-400/10 -rotate-12 animate-pulse delay-300" />
+      </div>
 
-      <div className="relative z-10 p-6 max-w-2xl mx-auto">
-        <h1 className="text-6xl font-black text-white text-center mb-12 drop-shadow-2xl">
-          Pointer ma Présence
+      <div className="relative min-h-screen px-6 py-12 max-w-2xl mx-auto text-white">
+        <h1 className="text-5xl font-bold text-center mb-8 text-yellow-400 drop-shadow-2xl">
+          Pointer ma présence
         </h1>
 
-        {message && (
-          <div className={`mb-8 p-6 rounded-2xl text-center font-bold text-2xl transition-all animate-pulse ${
-            message.includes('succès')
-              ? 'bg-green-500/20 border-2 border-green-400 text-green-300'
-              : 'bg-red-500/20 border-2 border-red-400 text-red-300'
-          }`}>
-            {message}
-          </div>
-        )}
+        <div className="text-center mb-10">
+          <Link href="/dashboard/historique-presences" className="inline-block text-2xl font-semibold text-cyan-400 hover:text-cyan-300 hover:underline transition-all duration-300 transform hover:scale-105">
+            Voir mon historique →
+          </Link>
+        </div>
 
-        <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur-xl rounded-3xl p-10 border border-white/20 shadow-2xl space-y-8">
+        {/* MESSAGE FOND BLANC + TEXTE BLEU/ROUGE */}
+        {message && (
+  <div className={`text-center p-5 rounded-2xl mb-10 text-lg font-bold backdrop-blur-sm border-2 shadow-lg transition-all
+    ${message.includes('succès') || message.includes('envoyée')
+      ? 'bg-green-600/10 border-green-500 text-indigo-900'
+      : 'bg-red-600/10 border-red-500 text-indigo-900'
+    }`}>
+    <span className="drop-shadow-md">{message}</span>
+  </div>
+)}
+
+        <form onSubmit={handleSubmit} className="bg-zinc-900/80 backdrop-blur-sm border border-white/10 rounded-3xl p-10 shadow-2xl space-y-8">
           <div>
-            <label className="text-white/80 text-xl font-medium">Date du jour</label>
+            <label className="block text-lg font-semibold text-gray-300 mb-2">Date</label>
             <input
               type="date"
               name="date"
               value={formData.date}
               onChange={handleChange}
               required
-              className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition"
+              className="w-full p-4 bg-white/5 border border-white/20 rounded-xl text-white focus:border-yellow-400 focus:outline-none transition"
             />
           </div>
 
           <div>
-            <label className="text-white/80 text-xl font-medium">Statut</label>
+            <label className="block text-lg font-semibold text-gray-300 mb-2">Statut</label>
             <select
               name="statut"
               value={formData.statut}
               onChange={handleChange}
-              className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white focus:border-purple-400 focus:outline-none transition"
+              className="w-full p-4 bg-white/5 border border-white/20 rounded-xl text-black focus:border-yellow-400 focus:outline-none transition"
             >
-              <option value="Present" className="bg-gray-800">Présent</option>
-              <option value="Absent" className="bg-gray-800">Absent</option>
-              <option value="Conge" className="bg-gray-800">En congé</option>
-              <option value="Maladie" className="bg-gray-800">Maladie</option>
-              <option value="Retard" className="bg-gray-800">En retard</option>
-              <option value="AbsentSansJustification" className="bg-gray-800">Absent sans justification</option>
+              <option value="Present">Présent</option>
+              <option value="Absent">Absent</option>
+              <option value="Conge">En congé</option>
+              <option value="Maladie">Maladie</option>
+              <option value="Retard">En retard</option>
+              <option value="AbsentSansJustification">Absent sans justification</option>
             </select>
           </div>
 
           {formData.statut === 'Present' && (
             <>
               <div>
-                <label className="text-white/80 text-xl font-medium">Heure d’arrivée</label>
+                <label className="block text-lg font-semibold text-gray-300 mb-2">Heure d’arrivée</label>
                 <input
                   type="time"
                   name="heureArrivee"
                   value={formData.heureArrivee}
                   onChange={handleChange}
                   required
-                  className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition"
+                  className="w-full p-4 bg-white/5 border border-white/20 rounded-xl text-white focus:border-yellow-400 focus:outline-none transition"
                 />
               </div>
               <div>
-                <label className="text-white/80 text-xl font-medium">Heure de départ (facultatif)</label>
+                <label className="block text-lg font-semibold text-gray-300 mb-2">Heure de départ (facultatif)</label>
                 <input
                   type="time"
                   name="heureDepart"
                   value={formData.heureDepart}
                   onChange={handleChange}
-                  className="w-full mt-3 px-6 py-5 rounded-xl bg-white/10 border-2 border-white/30 text-white placeholder-white/50 focus:border-purple-400 focus:outline-none transition"
+                  className="w-full p-4 bg-white/5 border border-white/20 rounded-xl text-white focus:border-yellow-400 focus:outline-none transition"
                 />
               </div>
             </>
@@ -149,18 +164,12 @@ export default function PresencesPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-7 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black text-3xl rounded-xl shadow-2xl hover:shadow-purple-500/50 transform hover:scale-105 transition disabled:opacity-60"
+            className="w-full py-6 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-black text-2xl rounded-2xl shadow-2xl hover:shadow-purple-600/50 hover:scale-105 transition-all duration-300 disabled:opacity-70"
           >
-            {isSubmitting ? 'Enregistrement...' : 'Pointer ma présence'}
+            {isSubmitting ? 'Enregistrement...' : 'Pointer maintenant'}
           </button>
-
-          <div className="text-center pt-6">
-            <Link href="/dashboard/historique-presences" className="text-white/80 text-xl underline hover:text-white transition">
-              Voir mon historique de présences
-            </Link>
-          </div>
         </form>
       </div>
-    </div>
+    </>
   );
 }
